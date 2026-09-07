@@ -30,9 +30,18 @@ Application web autonome (un seul fichier `index.html`) qui :
   déterminer son **kilomètre** exact. Un filtre de sécurité (> 60 m du tracé)
   écarte les faux positifs.
 
+## Formats acceptés
+
+- **GPX** (`.gpx`) : balises `trkpt`, `rtept` ou `wpt`.
+- **KML** (`.kml`) : balises `<coordinates>` / `<gx:coord>` (exports Google Maps,
+  Google My Maps…). Pour un **KMZ**, dézippe-le d'abord et charge le `.kml`.
+
 ## Technique
 
-- [Leaflet](https://leafletjs.com/) pour la carte, tuiles OpenStreetMap.
+- [Leaflet](https://leafletjs.com/) **intégré directement** dans `index.html`
+  (aucun CDN à charger) ; fond de carte : tuiles OpenStreetMap.
 - [API Overpass](https://overpass-api.de/) pour les données ronds-points
   (plusieurs miroirs sont essayés en cas d'indisponibilité).
 - Aucune dépendance à installer, aucun serveur : tout est dans `index.html`.
+- Une connexion internet reste nécessaire pour le fond de carte et la
+  recherche des ronds-points (API Overpass).
