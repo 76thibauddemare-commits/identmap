@@ -4,8 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>IdentMap — Compteur de ronds-points sur trace GPX</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
   :root {
     --bg: #0f1419;
@@ -197,12 +196,12 @@
 <body>
   <header>
     <h1>Ident<span class="dot">Map</span></h1>
-    <button class="file-btn" id="loadBtn">
+    <label class="file-btn" for="fileInput">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
       Charger un GPX
-    </button>
+    </label>
+    <input type="file" id="fileInput" accept=".gpx,.xml,application/gpx+xml,text/xml" />
     <span class="hint" id="fileHint">Aucun fichier — glisse ton .gpx ici ou clique sur le bouton</span>
-    <input type="file" id="fileInput" accept=".gpx,application/gpx+xml,text/xml" />
   </header>
 
   <div class="main">
@@ -228,22 +227,25 @@
 
   <div id="drop-overlay">Dépose ton fichier GPX</div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function () {
   "use strict";
 
-  // ---------- Map setup ----------
-  const map = L.map('map', { zoomControl: true }).setView([46.6, 2.5], 6); // France par défaut
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap'
-  }).addTo(map);
-
-  let trackLayer = null;
-  let markersLayer = L.layerGroup().addTo(map);
+  // ---------- Map setup (défensif : ne doit jamais bloquer le chargement GPX) ----------
+  let map = null, trackLayer = null, markersLayer = null;
   const markerById = {};
+  const hasLeaflet = typeof L !== 'undefined';
+  if (hasLeaflet) {
+    try {
+      map = L.map('map', { zoomControl: true }).setView([46.6, 2.5], 6); // France par défaut
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(map);
+      markersLayer = L.layerGroup().addTo(map);
+    } catch (e) { console.error('Init carte:', e); }
+  }
 
   const els = {
     status: document.getElementById('status'),
@@ -392,7 +394,7 @@ out geom;`;
   }
 
   function clearResults() {
-    markersLayer.clearLayers();
+    if (markersLayer) markersLayer.clearLayers();
     els.tableBody.innerHTML = '';
     for (const k in markerById) delete markerById[k];
   }
@@ -420,9 +422,12 @@ out geom;`;
         html: `<div class="rp-marker${isMini ? ' mini' : ''}">${n}</div>`,
         iconSize: [28, 28], iconAnchor: [14, 14]
       });
-      const m = L.marker([rp.lat, rp.lon], { icon }).addTo(markersLayer);
-      m.bindPopup(`<b>Rond-point n°${n}</b><br>Km ${(rp.meters/1000).toFixed(2)}<br>${rp.label}`);
-      markerById[n] = m;
+      let m = null;
+      if (map && markersLayer) {
+        m = L.marker([rp.lat, rp.lon], { icon }).addTo(markersLayer);
+        m.bindPopup(`<b>Rond-point n°${n}</b><br>Km ${(rp.meters/1000).toFixed(2)}<br>${rp.label}`);
+        markerById[n] = m;
+      }
 
       const tr = document.createElement('tr');
       tr.innerHTML =
@@ -430,8 +435,7 @@ out geom;`;
         `<td class="km">${(rp.meters/1000).toFixed(2)}</td>` +
         `<td class="type-tag">${rp.label}</td>`;
       tr.addEventListener('click', () => {
-        map.setView([rp.lat, rp.lon], 17, { animate: true });
-        m.openPopup();
+        if (map && m) { map.setView([rp.lat, rp.lon], 17, { animate: true }); m.openPopup(); }
       });
       els.tableBody.appendChild(tr);
     });
@@ -445,10 +449,12 @@ out geom;`;
       const dist = buildDistances(pts);
 
       // Affiche la trace
-      if (trackLayer) map.removeLayer(trackLayer);
-      const latlngs = pts.map(p => [p.lat, p.lon]);
-      trackLayer = L.polyline(latlngs, { color: '#ff6b35', weight: 4, opacity: .9 }).addTo(map);
-      map.fitBounds(trackLayer.getBounds(), { padding: [30, 30] });
+      if (map) {
+        if (trackLayer) map.removeLayer(trackLayer);
+        const latlngs = pts.map(p => [p.lat, p.lon]);
+        trackLayer = L.polyline(latlngs, { color: '#ff6b35', weight: 4, opacity: .9 }).addTo(map);
+        map.fitBounds(trackLayer.getBounds(), { padding: [30, 30] });
+      }
 
       els.statDist.textContent = fmtDist(dist.total);
       els.statCount.textContent = '…';
@@ -502,8 +508,14 @@ out geom;`;
 
   // ---------- Événements ----------
   const fileInput = document.getElementById('fileInput');
-  document.getElementById('loadBtn').addEventListener('click', () => fileInput.click());
+  // Le bouton est un <label for="fileInput"> : il ouvre le sélecteur nativement,
+  // sans JavaScript (fonctionne donc même si le reste du script échoue).
   fileInput.addEventListener('change', e => readFile(e.target.files[0]));
+
+  if (!hasLeaflet) {
+    setStatus('Carte non disponible (Leaflet non chargé — vérifie ta connexion internet). ' +
+              'Le décompte des ronds-points fonctionne quand même.', 'error');
+  }
 
   // Glisser-déposer
   let dragDepth = 0;
