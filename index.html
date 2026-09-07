@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>IdentMap — Compteur de ronds-points sur trace GPX</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a2129;
+    --panel-2: #232c37;
+    --border: #313d4a;
+    --text: #e6edf3;
+    --muted: #9fb0c0;
+    --accent: #ff6b35;
+    --accent-2: #4a9eff;
+    --green: #3fb950;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  header {
+    padding: 12px 18px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  header h1 {
+    font-size: 17px;
+    margin: 0;
+    font-weight: 650;
+    letter-spacing: .2px;
+    white-space: nowrap;
+  }
+  header h1 .dot { color: var(--accent); }
+  .file-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter .15s;
+  }
+  .file-btn:hover { filter: brightness(1.08); }
+  .hint { color: var(--muted); font-size: 13px; }
+  input[type=file] { display: none; }
+
+  .main {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
+  #map {
+    flex: 1;
+    min-width: 0;
+    background: #0b0e12;
+  }
+  .sidebar {
+    width: 380px;
+    max-width: 46vw;
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .summary {
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .stat {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .stat .value { font-size: 26px; font-weight: 700; line-height: 1.1; }
+  .stat .value.accent { color: var(--accent); }
+  .stat .label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .table-wrap { flex: 1; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  thead th {
+    position: sticky; top: 0;
+    background: var(--panel);
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background .12s;
+  }
+  tbody tr:hover { background: var(--panel-2); }
+  tbody td { padding: 10px 14px; vertical-align: middle; }
+  .badge {
+    display: inline-flex;
+    align-items: center; justify-content: center;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .badge.mini { background: var(--accent-2); }
+  .km { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .type-tag { font-size: 11px; color: var(--muted); }
+
+  .status {
+    padding: 10px 18px;
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    min-height: 20px;
+  }
+  .status.error { color: #ff7b72; }
+  .status.ok { color: var(--green); }
+
+  .empty {
+    padding: 40px 24px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .empty svg { opacity: .4; margin-bottom: 12px; }
+
+  /* Drag overlay */
+  #drop-overlay {
+    position: fixed; inset: 0;
+    background: rgba(15,20,25,.85);
+    border: 3px dashed var(--accent);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 9999;
+    font-size: 22px; font-weight: 700;
+    color: var(--accent);
+  }
+  body.dragging #drop-overlay { display: flex; }
+
+  /* Numbered marker */
+  .rp-marker {
+    background: var(--accent);
+    color: #fff;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.5);
+  }
+  .rp-marker.mini { background: var(--accent-2); }
+
+  .spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid var(--muted); border-top-color: transparent;
+    border-radius: 50%; animation: spin .7s linear infinite;
+    vertical-align: -2px; margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 720px) {
+    .main { flex-direction: column; }
+    .sidebar { width: 100%; max-width: none; height: 45%; border-left: none; border-top: 1px solid var(--border); }
+    #map { height: 55%; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Ident<span class="dot">Map</span></h1>
+    <button class="file-btn" id="loadBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      Charger un GPX
+    </button>
+    <span class="hint" id="fileHint">Aucun fichier — glisse ton .gpx ici ou clique sur le bouton</span>
+    <input type="file" id="fileInput" accept=".gpx,application/gpx+xml,text/xml" />
+  </header>
+
+  <div class="main">
+    <div id="map"></div>
+    <aside class="sidebar">
+      <div class="summary">
+        <div class="stat"><div class="value accent" id="statCount">—</div><div class="label">Ronds-points</div></div>
+        <div class="stat"><div class="value" id="statDist">—</div><div class="label">Distance totale</div></div>
+      </div>
+      <div class="table-wrap">
+        <div class="empty" id="emptyState">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="9"/></svg>
+          <div>Charge une trace GPX pour détecter<br>les ronds-points du parcours.</div>
+        </div>
+        <table id="tableBox" style="display:none">
+          <thead><tr><th>#</th><th>Km</th><th>Type</th></tr></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div class="status" id="status"></div>
+    </aside>
+  </div>
+
+  <div id="drop-overlay">Dépose ton fichier GPX</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Map setup ----------
+  const map = L.map('map', { zoomControl: true }).setView([46.6, 2.5], 6); // France par défaut
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+
+  let trackLayer = null;
+  let markersLayer = L.layerGroup().addTo(map);
+  const markerById = {};
+
+  const els = {
+    status: document.getElementById('status'),
+    statCount: document.getElementById('statCount'),
+    statDist: document.getElementById('statDist'),
+    tableBody: document.getElementById('tableBody'),
+    tableBox: document.getElementById('tableBox'),
+    emptyState: document.getElementById('emptyState'),
+    fileHint: document.getElementById('fileHint'),
+  };
+
+  function setStatus(msg, cls) {
+    els.status.className = 'status' + (cls ? ' ' + cls : '');
+    els.status.innerHTML = msg || '';
+  }
+
+  // ---------- Geo helpers ----------
+  const R = 6371000; // rayon terre (m)
+  const toRad = d => d * Math.PI / 180;
+
+  function haversine(a, b) {
+    const dLat = toRad(b.lat - a.lat);
+    const dLon = toRad(b.lon - a.lon);
+    const la1 = toRad(a.lat), la2 = toRad(b.lat);
+    const h = Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+
+  // Projection locale (équirectangulaire) en mètres autour d'une latitude de référence
+  function makeProjector(refLat) {
+    const cos = Math.cos(toRad(refLat));
+    return p => ({ x: toRad(p.lon) * R * cos, y: toRad(p.lat) * R });
+  }
+
+  // ---------- GPX parsing ----------
+  function parseGPX(text) {
+    const xml = new DOMParser().parseFromString(text, 'application/xml');
+    if (xml.querySelector('parsererror')) throw new Error('Fichier GPX invalide.');
+    let nodes = Array.from(xml.getElementsByTagName('trkpt'));
+    if (nodes.length === 0) nodes = Array.from(xml.getElementsByTagName('rtept'));
+    if (nodes.length === 0) nodes = Array.from(xml.getElementsByTagName('wpt'));
+    const pts = nodes.map(n => ({
+      lat: parseFloat(n.getAttribute('lat')),
+      lon: parseFloat(n.getAttribute('lon'))
+    })).filter(p => isFinite(p.lat) && isFinite(p.lon));
+    if (pts.length < 2) throw new Error('Trace GPX trop courte ou vide.');
+    return pts;
+  }
+
+  // Distance cumulée + longueur des segments
+  function buildDistances(pts) {
+    const cum = [0];
+    const seg = [];
+    for (let i = 1; i < pts.length; i++) {
+      const d = haversine(pts[i-1], pts[i]);
+      seg.push(d);
+      cum.push(cum[i-1] + d);
+    }
+    return { cum, seg, total: cum[cum.length - 1] };
+  }
+
+  // Trace réduite pour la requête Overpass (points espacés d'au moins minGap m, plafonnée)
+  function downsample(pts, minGap, maxPts) {
+    const out = [pts[0]];
+    let last = pts[0];
+    for (let i = 1; i < pts.length - 1; i++) {
+      if (haversine(last, pts[i]) >= minGap) { out.push(pts[i]); last = pts[i]; }
+    }
+    out.push(pts[pts.length - 1]);
+    if (out.length > maxPts) {
+      const step = out.length / maxPts;
+      const red = [];
+      for (let i = 0; i < out.length; i += step) red.push(out[Math.floor(i)]);
+      return red;
+    }
+    return out;
+  }
+
+  // Point le plus proche du tracé -> renvoie la distance (m) et le km cumulé
+  function nearestOnTrack(target, pts, dist, project) {
+    const T = project(target);
+    let best = { d2: Infinity, meters: 0 };
+    for (let i = 0; i < pts.length - 1; i++) {
+      const A = project(pts[i]);
+      const B = project(pts[i+1]);
+      const dx = B.x - A.x, dy = B.y - A.y;
+      const len2 = dx*dx + dy*dy;
+      let t = len2 ? ((T.x - A.x)*dx + (T.y - A.y)*dy) / len2 : 0;
+      t = Math.max(0, Math.min(1, t));
+      const px = A.x + t*dx, py = A.y + t*dy;
+      const d2 = (T.x-px)**2 + (T.y-py)**2;
+      if (d2 < best.d2) {
+        best = { d2, meters: dist.cum[i] + t * dist.seg[i] };
+      }
+    }
+    return { dist: Math.sqrt(best.d2), meters: best.meters };
+  }
+
+  // ---------- Overpass ----------
+  const OVERPASS_ENDPOINTS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+  ];
+
+  function buildQuery(sampled) {
+    // liste "lat,lon,lat,lon,..." pour le filtre around (linestring)
+    const coords = sampled.map(p => p.lat.toFixed(6) + ',' + p.lon.toFixed(6)).join(',');
+    const r = 25; // rayon autour du tracé (m)
+    return `[out:json][timeout:120];
+(
+  way(around:${r},${coords})["junction"="roundabout"];
+  way(around:${r},${coords})["junction"="circular"];
+  node(around:${r},${coords})["highway"="mini_roundabout"];
+);
+out geom;`;
+  }
+
+  async function queryOverpass(query) {
+    let lastErr;
+    for (const url of OVERPASS_ENDPOINTS) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'data=' + encodeURIComponent(query)
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return await res.json();
+      } catch (e) { lastErr = e; }
+    }
+    throw new Error('Serveur OpenStreetMap injoignable (' + (lastErr && lastErr.message) + ').');
+  }
+
+  function elementCentroid(el) {
+    if (el.type === 'node') return { lat: el.lat, lon: el.lon };
+    const g = el.geometry || [];
+    let sLat = 0, sLon = 0, n = 0;
+    for (const p of g) { if (p) { sLat += p.lat; sLon += p.lon; n++; } }
+    return n ? { lat: sLat/n, lon: sLon/n } : null;
+  }
+
+  // ---------- Rendu ----------
+  function fmtDist(m) {
+    return m >= 1000 ? (m/1000).toFixed(m >= 10000 ? 0 : 1) + ' km' : Math.round(m) + ' m';
+  }
+
+  function clearResults() {
+    markersLayer.clearLayers();
+    els.tableBody.innerHTML = '';
+    for (const k in markerById) delete markerById[k];
+  }
+
+  function render(roundabouts, total) {
+    clearResults();
+    els.statCount.textContent = roundabouts.length;
+    els.statDist.textContent = fmtDist(total);
+
+    if (roundabouts.length === 0) {
+      els.tableBox.style.display = 'none';
+      els.emptyState.style.display = 'block';
+      els.emptyState.querySelector('div:last-child').innerHTML =
+        'Aucun rond-point détecté sur ce parcours.';
+      return;
+    }
+    els.emptyState.style.display = 'none';
+    els.tableBox.style.display = 'table';
+
+    roundabouts.forEach((rp, idx) => {
+      const n = idx + 1;
+      const isMini = rp.type === 'mini';
+      const icon = L.divIcon({
+        className: '',
+        html: `<div class="rp-marker${isMini ? ' mini' : ''}">${n}</div>`,
+        iconSize: [28, 28], iconAnchor: [14, 14]
+      });
+      const m = L.marker([rp.lat, rp.lon], { icon }).addTo(markersLayer);
+      m.bindPopup(`<b>Rond-point n°${n}</b><br>Km ${(rp.meters/1000).toFixed(2)}<br>${rp.label}`);
+      markerById[n] = m;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        `<td><span class="badge${isMini ? ' mini' : ''}">${n}</span></td>` +
+        `<td class="km">${(rp.meters/1000).toFixed(2)}</td>` +
+        `<td class="type-tag">${rp.label}</td>`;
+      tr.addEventListener('click', () => {
+        map.setView([rp.lat, rp.lon], 17, { animate: true });
+        m.openPopup();
+      });
+      els.tableBody.appendChild(tr);
+    });
+  }
+
+  // ---------- Pipeline principal ----------
+  async function process(text) {
+    try {
+      setStatus('<span class="spinner"></span>Lecture de la trace…');
+      const pts = parseGPX(text);
+      const dist = buildDistances(pts);
+
+      // Affiche la trace
+      if (trackLayer) map.removeLayer(trackLayer);
+      const latlngs = pts.map(p => [p.lat, p.lon]);
+      trackLayer = L.polyline(latlngs, { color: '#ff6b35', weight: 4, opacity: .9 }).addTo(map);
+      map.fitBounds(trackLayer.getBounds(), { padding: [30, 30] });
+
+      els.statDist.textContent = fmtDist(dist.total);
+      els.statCount.textContent = '…';
+
+      setStatus('<span class="spinner"></span>Recherche des ronds-points (OpenStreetMap)…');
+      const sampled = downsample(pts, 15, 1800);
+      const data = await queryOverpass(buildQuery(sampled));
+
+      const refLat = pts[Math.floor(pts.length/2)].lat;
+      const project = makeProjector(refLat);
+
+      const seen = new Set();
+      const roundabouts = [];
+      for (const el of (data.elements || [])) {
+        const key = el.type + '/' + el.id;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const c = elementCentroid(el);
+        if (!c) continue;
+        const near = nearestOnTrack(c, pts, dist, project);
+        if (near.dist > 60) continue; // sécurité anti faux-positifs
+        const tags = el.tags || {};
+        const isMini = tags.highway === 'mini_roundabout';
+        const label = isMini ? 'Mini rond-point'
+          : (tags.junction === 'circular' ? 'Giratoire' : 'Rond-point');
+        roundabouts.push({
+          lat: c.lat, lon: c.lon,
+          meters: near.meters,
+          type: isMini ? 'mini' : 'normal',
+          label
+        });
+      }
+      roundabouts.sort((a, b) => a.meters - b.meters);
+
+      render(roundabouts, dist.total);
+      setStatus(`${roundabouts.length} rond(s)-point(s) sur ${fmtDist(dist.total)}.`, 'ok');
+    } catch (e) {
+      console.error(e);
+      setStatus('Erreur : ' + e.message, 'error');
+    }
+  }
+
+  function readFile(file) {
+    if (!file) return;
+    els.fileHint.textContent = file.name;
+    const reader = new FileReader();
+    reader.onload = () => process(reader.result);
+    reader.onerror = () => setStatus('Impossible de lire le fichier.', 'error');
+    reader.readAsText(file);
+  }
+
+  // ---------- Événements ----------
+  const fileInput = document.getElementById('fileInput');
+  document.getElementById('loadBtn').addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => readFile(e.target.files[0]));
+
+  // Glisser-déposer
+  let dragDepth = 0;
+  window.addEventListener('dragenter', e => { e.preventDefault(); dragDepth++; document.body.classList.add('dragging'); });
+  window.addEventListener('dragover', e => e.preventDefault());
+  window.addEventListener('dragleave', e => { e.preventDefault(); if (--dragDepth <= 0) document.body.classList.remove('dragging'); });
+  window.addEventListener('drop', e => {
+    e.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging');
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);
+  });
+})();
+</script>
+</body>
+</html>
