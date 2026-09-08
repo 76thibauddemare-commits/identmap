@@ -865,7 +865,9 @@ svg.leaflet-image-layer.leaflet-interactive path {
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
       Charger un GPX
     </label>
-    <input type="file" id="fileInput" accept=".gpx,.xml,application/gpx+xml,text/xml" />
+    <!-- Pas d'attribut accept : sur iOS un filtre .gpx grise le fichier et le rend
+         inélectionnable. On accepte tout et parseTrack valide le contenu. -->
+    <input type="file" id="fileInput" />
     <span class="hint" id="fileHint">Aucun fichier — glisse ton .gpx ici ou clique sur le bouton</span>
   </header>
 
