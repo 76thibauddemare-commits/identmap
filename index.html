@@ -1106,11 +1106,17 @@ svg.leaflet-image-layer.leaflet-interactive path {
         const near=g=>index.query(g.lat,g.lon);
         const seen=new Set();
 
-        // Ronds-points
-        if(selSet.has('roundabout')){
-          for(const w of ways){const j=w.tags&&w.tags.junction;if(j==='roundabout'||j==='circular'){const c=centroid(w.geometry);let nr=near(c);let on=nr.dist<=45;if(!on&&nr.dist<=160){for(const g of w.geometry){const q=near(g);if(q.dist<=32){on=true;nr=q;break;}}}if(on)events.roundabout.push({lat:c.lat,lon:c.lon,meters:nr.meters,detail:j==='circular'?'Giratoire':'Rond-point'});}}
-          for(const nd of osmNodes){if(nd.tags&&nd.tags.highway==='mini_roundabout'){const nr=near(nd);if(nr.dist<=25){const k='n'+nd.id;if(seen.has(k))continue;seen.add(k);events.roundabout.push({lat:nd.lat,lon:nd.lon,meters:nr.meters,detail:'Mini rond-point'});}}}
-        }
+        // Ronds-points : toujours calculés (sert au dédoublonnage ET de zone d'exclusion)
+        const rAll=[];
+        for(const w of ways){const j=w.tags&&w.tags.junction;if(j==='roundabout'||j==='circular'){const c=centroid(w.geometry);let nr=near(c);let on=nr.dist<=45;if(!on&&nr.dist<=160){for(const g of w.geometry){const q=near(g);if(q.dist<=32){on=true;nr=q;break;}}}if(on)rAll.push({lat:c.lat,lon:c.lon,meters:nr.meters,radius:roundRadius(w.geometry,c),detail:j==='circular'?'Giratoire':'Rond-point'});}}
+        for(const ndn of osmNodes){if(ndn.tags&&ndn.tags.highway==='mini_roundabout'){const nr=near(ndn);if(nr.dist<=25)rAll.push({lat:ndn.lat,lon:ndn.lon,meters:nr.meters,radius:10,detail:'Mini rond-point'});}}
+        // dédoublonnage géographique (un même rond-point cartographié en plusieurs tronçons / repassé)
+        rAll.sort((a,b)=>b.radius-a.radius);
+        const rDedup=[];
+        for(const r of rAll){let dup=false;for(const d of rDedup){if(haversine(r,d)<=Math.max(45,d.radius+r.radius+10)){dup=true;break;}}if(!dup)rDedup.push(r);}
+        rDedup.sort((a,b)=>a.meters-b.meters);
+        if(selSet.has('roundabout')) events.roundabout=rDedup.map(r=>({lat:r.lat,lon:r.lon,meters:r.meters,detail:r.detail}));
+        const inRound=(lat,lon)=>{for(const r of rDedup){if(haversine({lat,lon},r)<=r.radius+45)return true;}return false;};
         // Événements ponctuels OSM (noeuds)
         for(const t of nodeTypes){const test=nodeTest(TYPES[t].node),thr=TYPES[t].thr||24;
           for(const nd of osmNodes){if(!test(nd.tags||{}))continue;const nr=near(nd);if(nr.dist>thr)continue;const k=t+nd.id;if(seen.has(k))continue;seen.add(k);
@@ -1145,10 +1151,15 @@ svg.leaflet-image-layer.leaflet-interactive path {
           if(attrWant.maxspeed)events.speed_limit_change=ch.maxspeed;
           if(attrWant.lanes)events.lanes_change=ch.lanes;
           if(attrWant.category)events.category_change=ch.category;}
+        // Un rond-point n'est ni un virage ni une intersection : on exclut sa zone
+        const EXCL=['curve','hairpin','decreasing_radius','s_curve','crest_curve','intersection','turn_curve','cross_curve'];
+        for(const t of EXCL) if(events[t]&&events[t].length) events[t]=events[t].filter(ev=>!inRound(ev.lat,ev.lon));
+        els.statCurves.textContent=geo.curves.filter(c=>!inRound(c.lat,c.lon)).length;
         window.__failT=failT;
       }
 
       for(const t of ORDER)(events[t]||[]).sort((a,b)=>a.meters-b.meters);
+      try{window.__events=events;}catch(e){}
       for(const t of ORDER)enabled[t]=selected[t]&&TYPES[t].def&&(events[t]||[]).length>0;
       drawEvents();applyVis();renderLayerList();renderTable();
       const total=ORDER.reduce((s,t)=>s+(selected[t]?(events[t]||[]).length:0),0);
@@ -1158,6 +1169,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   }
 
   function centroid(g){let a=0,o=0,n=0;for(const p of g){if(p){a+=p.lat;o+=p.lon;n++;}}return n?{lat:a/n,lon:o/n}:null;}
+  function roundRadius(geom,c){let m=0;for(const g of geom){if(!g)continue;const d=haversine(g,c);if(d>m)m=d;}return Math.max(6,m);}
   function segLen(p){let d=0;for(let i=1;i<p.length;i++)d+=haversine(p[i-1],p[i]);return d;}
   function onTrackRun(geom,near,thr){let start=-1,path=[],best=null;
     for(let i=0;i<geom.length;i++){const on=near(geom[i]).dist<=thr;if(on){if(start<0)start=i;path.push(geom[i]);}else{if(start>=0){if(segLen(path)>=40&&!best)best={startM:near(path[0]).meters,path:path.slice()};start=-1;path=[];}}}

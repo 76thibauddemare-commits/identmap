@@ -58,6 +58,11 @@ une carte interactive avec un **tableau de synthèse trié par kilomètre**.
   par zone (uniquement les objets cochés) → routes + nœuds. Intersections =
   nœuds de degré ≥ 3. Filtrage par proximité au tracé via un index spatial.
 - **Changements d'attributs** : appariement léger des tronçons OSM au tracé.
+- **Ronds-points** : dédoublonnés géographiquement (un rond-point cartographié en
+  plusieurs tronçons OSM, ou repassé, n'apparaît qu'une fois) ; leur zone est
+  exclue des virages, épingles, rayons décroissants, enchaînements en S et
+  intersections — un rond-point n'est jamais compté comme un virage ni une
+  intersection (le « nombre de virages » l'exclut aussi).
 
 ## Technique
 
