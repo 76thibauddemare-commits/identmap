@@ -1279,7 +1279,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   $('mymapsBtn').addEventListener('click',()=>{if(!curPts)return;
     const base=(curName||'trace').replace(/\.[^.]+$/,'');
     downloadFile(base+'_identmap.kml',buildKml(),'application/vnd.google-earth.kml+xml');
-    window.open('https://www.google.com/maps/d/','_blank','noopener');
+    window.open('https://www.google.com/mymaps/?hl=fr','_blank','noopener');
     setStatus('✅ KML téléchargé. Dans Google My Maps (ouvert dans l\'onglet) : « Créer une carte » → « Importer » → choisis le fichier .kml → le tracé fidèle et les événements s\'affichent.','ok');
   });
 
