@@ -16,6 +16,11 @@ une carte interactive avec un **tableau de synthèse trié par kilomètre**.
    compteurs, et tableau (clic = recentrage).
 5. **Filtre environnement** : *Tout / En ville / Hors ville* — n'affiche que les
    événements en agglomération ou hors agglomération (carte + tableau + compteurs).
+6. **Bouton Google Maps** : ouvre le parcours en navigation dans Google Maps
+   (app sur mobile). L'URL est limitée par Google à ~9 étapes : le tracé est
+   envoyé sous forme de départ + arrivée + ~8 points intermédiaires répartis,
+   Google reconstruit l'itinéraire routier entre eux (approximation, pas au
+   point près).
 
 ## Catalogue d'événements
 

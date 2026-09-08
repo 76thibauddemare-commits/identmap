@@ -677,6 +677,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   header h1{font-size:17px;margin:0;font-weight:650;white-space:nowrap;}
   header h1 .dot{color:var(--accent);}
   .file-btn{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;}
+  .file-btn.gmaps{background:#1a73e8;}
   .hint{color:var(--muted);font-size:13px;}
   input[type=file]{display:none;}
   .main{flex:1;display:flex;min-height:0;}
@@ -745,6 +746,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     <h1>Ident<span class="dot">Map</span></h1>
     <label class="file-btn" for="fileInput"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Charger un GPX</label>
     <input type="file" id="fileInput" />
+    <button class="file-btn gmaps" id="gmapsBtn" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg> Google Maps</button>
     <span class="hint" id="fileHint">Aucun fichier — glisse ton .gpx / .kml ici</span>
   </header>
 
@@ -1223,10 +1225,18 @@ svg.leaflet-image-layer.leaflet-interactive path {
     if(map){if(trackLayer)map.removeLayer(trackLayer);trackLayer=L.polyline(pts.map(p=>[p.lat,p.lon]),{color:'#ff6b35',weight:3,opacity:.85}).addTo(map);
       try{map.fitBounds(trackLayer.getBounds(),{padding:[30,30]});}catch(e){}setTimeout(()=>{try{map.invalidateSize();}catch(e){}},200);}
     els.configPanel.hidden=false;els.resultsPanel.hidden=true;
+    $('gmapsBtn').hidden=false;
     els.cfgHint.textContent=`${pts.length} pts · ${fmtDist(dist.total)}${hasEle?' · altitude ✓':''}`;
     buildConfig();
     setStatus(`Trace lue : ${pts.length} points, ${fmtDist(dist.total)}${hasEle?', altitude détectée':''}. Choisis les événements puis lance l'analyse.`,'ok');
   }
+  // Itinéraire Google Maps : départ + arrivée + ~8 étapes réparties (limite d'URL)
+  function gmapsUrl(pts,dist){const N=8,fmt=p=>p.lat.toFixed(6)+','+p.lon.toFixed(6);
+    const at=m=>{let lo=0,hi=dist.cum.length-1;while(lo<hi){const mid=(lo+hi)>>1;if(dist.cum[mid]<m)lo=mid+1;else hi=mid;}return pts[Math.max(0,Math.min(pts.length-1,lo))];};
+    const mids=[];for(let k=1;k<=N;k++)mids.push(at(k*dist.total/(N+1)));
+    return `https://www.google.com/maps/dir/?api=1&origin=${fmt(pts[0])}&destination=${fmt(pts[pts.length-1])}&travelmode=driving&waypoints=${encodeURIComponent(mids.map(fmt).join('|'))}`;}
+  $('gmapsBtn').addEventListener('click',()=>{if(curPts&&curDist)window.open(gmapsUrl(curPts,curDist),'_blank','noopener');});
+
   function readFile(file){if(!file)return;els.fileHint.textContent=file.name;const r=new FileReader();r.onload=()=>{try{loadPts(r.result);}catch(e){setStatus('⚠️ '+e.message,'error');showBanner(e.message);}};r.onerror=()=>setStatus('Impossible de lire le fichier.','error');r.readAsText(file);}
   $('fileInput').addEventListener('change',e=>readFile(e.target.files[0]));
   els.runBtn.addEventListener('click',()=>{setStatus('<span class="spinner"></span>Analyse…');setTimeout(analyze,30);});
