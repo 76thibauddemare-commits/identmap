@@ -21,6 +21,12 @@ une carte interactive avec un **tableau de synthèse trié par kilomètre**.
    envoyé sous forme de départ + arrivée + ~8 points intermédiaires répartis,
    Google reconstruit l'itinéraire routier entre eux (approximation, pas au
    point près).
+7. **Bouton My Maps (fidèle)** : télécharge un **KML** du tracé complet (au point
+   près) + les événements affichés, et ouvre **Google My Maps** — il suffit d'y
+   faire *Créer une carte → Importer* le fichier pour voir le tracé exact.
+8. **Topic « Virages (tous) »** : une case maître dans les résultats affiche ou
+   masque d'un coup toutes les familles de virages (bandes de rayon, épingles,
+   rayon décroissant, enchaînements en S).
 
 ## Catalogue d'événements
 

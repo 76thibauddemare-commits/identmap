@@ -678,6 +678,10 @@ svg.leaflet-image-layer.leaflet-interactive path {
   header h1 .dot{color:var(--accent);}
   .file-btn{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;}
   .file-btn.gmaps{background:#1a73e8;}
+  .file-btn.mymaps{background:#0f9d58;}
+  .layer-row.master{background:#20304a;font-weight:700;}
+  .layer-row.master .name b{font-weight:700;}
+  .layer-row.sub{padding-left:20px;}
   .hint{color:var(--muted);font-size:13px;}
   input[type=file]{display:none;}
   .main{flex:1;display:flex;min-height:0;}
@@ -747,6 +751,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     <label class="file-btn" for="fileInput"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Charger un GPX</label>
     <input type="file" id="fileInput" />
     <button class="file-btn gmaps" id="gmapsBtn" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg> Google Maps</button>
+    <button class="file-btn mymaps" id="mymapsBtn" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7l6-3 4 3 6-3v13l-6 3-4-3-6 3z"/></svg> My Maps (fidèle)</button>
     <span class="hint" id="fileHint">Aucun fichier — glisse ton .gpx / .kml ici</span>
   </header>
 
@@ -857,12 +862,13 @@ svg.leaflet-image-layer.leaflet-interactive path {
   };
   const ORDER=Object.keys(TYPES);
   const CURVE_TYPES=['curve_50','curve_100','curve_300','curve_500','curve_500p'];
+  const VIRAGE_FAMILY=[...CURVE_TYPES,'hairpin','decreasing_radius','s_curve'];
   function curveBand(r){return r<50?'curve_50':r<100?'curve_100':r<300?'curve_300':r<500?'curve_500':'curve_500p';}
 
   // ================= État =================
   let map=null,trackLayer=null;
   const layerGroups={},enabled={},selected={};
-  let events={},curPts=null,curDist=null,hasEle=false;
+  let events={},curPts=null,curDist=null,hasEle=false,curName='';
   let envFilter='all',hasEnv=false;
   const hasLeaflet=typeof L!=='undefined';
   if(hasLeaflet){ try{
@@ -1023,11 +1029,24 @@ svg.leaflet-image-layer.leaflet-interactive path {
     (events[t]||[]).forEach(ev=>{if(!matchEnv(ev))return;if(TYPES[t].kind==='span'&&ev.path&&ev.path.length>1)L.polyline(ev.path.map(p=>[p.lat,p.lon]),{color:TYPES[t].color,weight:7,opacity:.8}).addTo(lg);
       const m=L.marker([ev.lat,ev.lon],{icon:evIcon(t,ev.badge||'')}).addTo(lg);m.bindPopup(`<b>${TYPES[t].label}</b><br>Km ${(ev.meters/1000).toFixed(2)}${ev.detail?'<br>'+ev.detail:''}`);ev._m=m;});}}
   function applyVis(){if(!map)return;for(const t of ORDER){if(!layerGroups[t])continue;if(enabled[t])layerGroups[t].addTo(map);else map.removeLayer(layerGroups[t]);}}
-  function renderLayerList(){els.layerList.innerHTML='';let any=false;
-    for(const t of ORDER){if(!selected[t])continue;const n=(events[t]||[]).filter(matchEnv).length;any=true;
-      const row=document.createElement('label');row.className='layer-row'+(n===0?' disabled':'');
+  function renderLayerList(){els.layerList.innerHTML='';let any=false,masterDone=false;
+    for(const t of ORDER){if(!selected[t])continue;
+      // Ligne maître « Virages (tous) » avant la 1re bande de virage sélectionnée
+      if(!masterDone&&VIRAGE_FAMILY.includes(t)){
+        const fam=VIRAGE_FAMILY.filter(f=>selected[f]);
+        const cnt=fam.reduce((s,f)=>s+(events[f]||[]).filter(matchEnv).length,0);
+        const onN=fam.filter(f=>enabled[f]).length;
+        const mrow=document.createElement('label');mrow.className='layer-row master';
+        mrow.innerHTML=`<input type="checkbox"><span class="swatch" style="background:linear-gradient(90deg,#f85149,#e3b341,#58a6ff)"></span><span class="name"><b>Virages (tous)</b></span><span class="count">${cnt}</span>`;
+        const mcb=mrow.querySelector('input');mcb.checked=onN===fam.length&&fam.length>0;mcb.indeterminate=onN>0&&onN<fam.length;
+        mcb.addEventListener('change',e=>{for(const f of fam)enabled[f]=e.target.checked;applyVis();renderLayerList();renderTable();});
+        els.layerList.appendChild(mrow);masterDone=true;
+      }
+      const n=(events[t]||[]).filter(matchEnv).length;any=true;
+      const sub=VIRAGE_FAMILY.includes(t)?' sub':'';
+      const row=document.createElement('label');row.className='layer-row'+sub+(n===0?' disabled':'');
       row.innerHTML=`<input type="checkbox" ${enabled[t]&&n>0?'checked':''} ${n===0?'disabled':''}><span class="swatch" style="background:${TYPES[t].color}"></span><span class="name">${TYPES[t].label}</span><span class="count">${n}</span>`;
-      row.querySelector('input').addEventListener('change',e=>{enabled[t]=e.target.checked;applyVis();renderTable();});
+      row.querySelector('input').addEventListener('change',e=>{enabled[t]=e.target.checked;applyVis();renderLayerList();renderTable();});
       els.layerList.appendChild(row);}
     if(!any)els.layerList.innerHTML='<div class="note" style="padding:8px">Aucun type sélectionné.</div>';}
   function renderEnv(){const seg=$('envSeg');if(!seg)return;[...seg.querySelectorAll('button')].forEach(b=>{b.classList.toggle('on',b.dataset.env===envFilter);if(b.dataset.env!=='all')b.disabled=!hasEnv;});$('envNote').textContent=hasEnv?'':'(coche un type OSM pour l\'activer)';}
@@ -1231,7 +1250,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     if(map){if(trackLayer)map.removeLayer(trackLayer);trackLayer=L.polyline(pts.map(p=>[p.lat,p.lon]),{color:'#ff6b35',weight:3,opacity:.85}).addTo(map);
       try{map.fitBounds(trackLayer.getBounds(),{padding:[30,30]});}catch(e){}setTimeout(()=>{try{map.invalidateSize();}catch(e){}},200);}
     els.configPanel.hidden=false;els.resultsPanel.hidden=true;
-    $('gmapsBtn').hidden=false;
+    $('gmapsBtn').hidden=false;$('mymapsBtn').hidden=false;
     els.cfgHint.textContent=`${pts.length} pts · ${fmtDist(dist.total)}${hasEle?' · altitude ✓':''}`;
     buildConfig();
     setStatus(`Trace lue : ${pts.length} points, ${fmtDist(dist.total)}${hasEle?', altitude détectée':''}. Choisis les événements puis lance l'analyse.`,'ok');
@@ -1243,7 +1262,28 @@ svg.leaflet-image-layer.leaflet-interactive path {
     return `https://www.google.com/maps/dir/?api=1&origin=${fmt(pts[0])}&destination=${fmt(pts[pts.length-1])}&travelmode=driving&waypoints=${encodeURIComponent(mids.map(fmt).join('|'))}`;}
   $('gmapsBtn').addEventListener('click',()=>{if(curPts&&curDist)window.open(gmapsUrl(curPts,curDist),'_blank','noopener');});
 
-  function readFile(file){if(!file)return;els.fileHint.textContent=file.name;const r=new FileReader();r.onload=()=>{try{loadPts(r.result);}catch(e){setStatus('⚠️ '+e.message,'error');showBanner(e.message);}};r.onerror=()=>setStatus('Impossible de lire le fichier.','error');r.readAsText(file);}
+  // Export KML fidèle (tracé complet + événements affichés) pour Google My Maps
+  function buildKml(){
+    const esc=s=>String(s).replace(/[<&>]/g,c=>({'<':'&lt;','&':'&amp;','>':'&gt;'}[c]));
+    const line=curPts.map(p=>`${p.lon.toFixed(6)},${p.lat.toFixed(6)}${isFinite(p.ele)?','+Math.round(p.ele):''}`).join(' ');
+    let marks='';
+    for(const t of ORDER){for(const ev of (events[t]||[])){if(!enabled[t]||!matchEnv(ev))continue;
+      marks+=`<Placemark><name>${esc(TYPES[t].label)} — km ${(ev.meters/1000).toFixed(2)}</name><description>${esc(ev.detail||'')}</description><Point><coordinates>${ev.lon.toFixed(6)},${ev.lat.toFixed(6)}</coordinates></Point></Placemark>`;}}
+    const kml=`<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>IdentMap — ${esc(curName||'trace')}</name>`+
+      `<Placemark><name>Tracé</name><Style><LineStyle><color>ff356bff</color><width>4</width></LineStyle></Style><LineString><tessellate>1</tessellate><coordinates>${line}</coordinates></LineString></Placemark>`+
+      marks+`</Document></kml>`;
+    try{window.__lastKml=kml;}catch(e){}
+    return kml;
+  }
+  function downloadFile(name,text,mime){const blob=new Blob([text],{type:mime});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},1500);}
+  $('mymapsBtn').addEventListener('click',()=>{if(!curPts)return;
+    const base=(curName||'trace').replace(/\.[^.]+$/,'');
+    downloadFile(base+'_identmap.kml',buildKml(),'application/vnd.google-earth.kml+xml');
+    window.open('https://www.google.com/maps/d/','_blank','noopener');
+    setStatus('✅ KML téléchargé. Dans Google My Maps (ouvert dans l\'onglet) : « Créer une carte » → « Importer » → choisis le fichier .kml → le tracé fidèle et les événements s\'affichent.','ok');
+  });
+
+  function readFile(file){if(!file)return;curName=file.name;els.fileHint.textContent=file.name;const r=new FileReader();r.onload=()=>{try{loadPts(r.result);}catch(e){setStatus('⚠️ '+e.message,'error');showBanner(e.message);}};r.onerror=()=>setStatus('Impossible de lire le fichier.','error');r.readAsText(file);}
   $('fileInput').addEventListener('change',e=>readFile(e.target.files[0]));
   els.runBtn.addEventListener('click',()=>{setStatus('<span class="spinner"></span>Analyse…');setTimeout(analyze,30);});
   $('backBtn').addEventListener('click',()=>{els.resultsPanel.hidden=true;els.configPanel.hidden=false;});
