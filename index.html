@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>IdentMap — Compteur de ronds-points sur trace GPX</title>
+<title>IdentMap — Événements routiers sur trace GPX</title>
 <style id="leaflet-css">
 /* required styles */
 
@@ -670,191 +670,86 @@ svg.leaflet-image-layer.leaflet-interactive path {
 </style>
 <style>
   :root {
-    --bg: #0f1419;
-    --panel: #1a2129;
-    --panel-2: #232c37;
-    --border: #313d4a;
-    --text: #e6edf3;
-    --muted: #9fb0c0;
-    --accent: #ff6b35;
-    --accent-2: #4a9eff;
-    --green: #3fb950;
+    --bg:#0f1419; --panel:#1a2129; --panel-2:#232c37; --border:#313d4a;
+    --text:#e6edf3; --muted:#9fb0c0; --green:#3fb950;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
+  html, body { height:100%; margin:0; }
   body {
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    overflow: hidden;
+    background: var(--bg); color: var(--text);
+    display:flex; flex-direction:column; height:100vh; overflow:hidden;
   }
   header {
-    padding: 12px 18px;
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    flex-wrap: wrap;
+    padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
   }
-  header h1 {
-    font-size: 17px;
-    margin: 0;
-    font-weight: 650;
-    letter-spacing: .2px;
-    white-space: nowrap;
-  }
-  header h1 .dot { color: var(--accent); }
+  header h1 { font-size:17px; margin:0; font-weight:650; white-space:nowrap; }
+  header h1 .dot { color:#ff6b35; }
   .file-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    padding: 8px 14px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: filter .15s;
+    display:inline-flex; align-items:center; gap:8px; background:#ff6b35; color:#fff;
+    border:none; padding:8px 14px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;
   }
-  .file-btn:hover { filter: brightness(1.08); }
-  .hint { color: var(--muted); font-size: 13px; }
-  input[type=file] { display: none; }
+  .hint { color:var(--muted); font-size:13px; }
+  input[type=file] { display:none; }
 
-  .main {
-    flex: 1;
-    display: flex;
-    min-height: 0;
-  }
-  #map {
-    flex: 1;
-    min-width: 0;
-    background: #0b0e12;
-  }
+  .main { flex:1; display:flex; min-height:0; }
+  #map { flex:1; min-width:0; background:#0b0e12; }
   .sidebar {
-    width: 380px;
-    max-width: 46vw;
-    background: var(--panel);
-    border-left: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
+    width:390px; max-width:48vw; background:var(--panel); border-left:1px solid var(--border);
+    display:flex; flex-direction:column; min-height:0;
   }
-  .summary {
-    padding: 16px 18px;
-    border-bottom: 1px solid var(--border);
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  .stat {
-    background: var(--panel-2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 14px;
-  }
-  .stat .value { font-size: 26px; font-weight: 700; line-height: 1.1; }
-  .stat .value.accent { color: var(--accent); }
-  .stat .label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .summary { padding:14px 16px 6px; display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .stat { background:var(--panel-2); border:1px solid var(--border); border-radius:10px; padding:11px 13px; }
+  .stat .value { font-size:24px; font-weight:700; line-height:1.1; }
+  .stat .label { font-size:12px; color:var(--muted); margin-top:3px; }
 
-  .table-wrap { flex: 1; overflow-y: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .layers { padding:8px 16px 12px; border-bottom:1px solid var(--border); }
+  .layers h2 { font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin:8px 0 6px; }
+  .layer-row {
+    display:flex; align-items:center; gap:10px; padding:7px 8px; border-radius:8px; cursor:pointer;
+  }
+  .layer-row:hover { background:var(--panel-2); }
+  .layer-row input { width:17px; height:17px; accent-color:#ff6b35; flex:none; }
+  .swatch { width:14px; height:14px; border-radius:4px; flex:none; border:1px solid rgba(255,255,255,.25); }
+  .layer-row .name { flex:1; font-size:13.5px; }
+  .layer-row .count { font-variant-numeric:tabular-nums; font-weight:700; font-size:14px; }
+  .layer-row.disabled { opacity:.5; }
+
+  .table-wrap { flex:1; overflow-y:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13.5px; }
   thead th {
-    position: sticky; top: 0;
-    background: var(--panel);
-    text-align: left;
-    padding: 10px 14px;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: .5px;
-    color: var(--muted);
-    border-bottom: 1px solid var(--border);
+    position:sticky; top:0; background:var(--panel); text-align:left; padding:9px 12px;
+    font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted);
+    border-bottom:1px solid var(--border);
   }
-  tbody tr {
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-    transition: background .12s;
-  }
-  tbody tr:hover { background: var(--panel-2); }
-  tbody td { padding: 10px 14px; vertical-align: middle; }
-  .badge {
-    display: inline-flex;
-    align-items: center; justify-content: center;
-    width: 26px; height: 26px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: #fff;
-    font-weight: 700;
-    font-size: 13px;
-  }
-  .badge.mini { background: var(--accent-2); }
-  .km { font-variant-numeric: tabular-nums; font-weight: 600; }
-  .type-tag { font-size: 11px; color: var(--muted); }
+  tbody tr { border-bottom:1px solid var(--border); cursor:pointer; }
+  tbody tr:hover { background:var(--panel-2); }
+  tbody td { padding:9px 12px; vertical-align:middle; }
+  .km { font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap; }
+  .ev-dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:7px; vertical-align:-1px; }
+  .ev-type { color:var(--muted); font-size:12.5px; }
 
-  .status {
-    padding: 12px 18px;
-    font-size: 13.5px;
-    line-height: 1.45;
-    color: var(--muted);
-    border-top: 1px solid var(--border);
-    min-height: 20px;
-  }
-  .status.error { background: #3d1f1f; }
-  .status.error { color: #ff7b72; }
-  .status.ok { color: var(--green); }
+  .status { padding:11px 16px; font-size:13px; line-height:1.45; color:var(--muted); border-top:1px solid var(--border); min-height:20px; }
+  .status.error { color:#ff7b72; background:#3d1f1f; }
+  .status.ok { color:var(--green); }
 
-  .empty {
-    padding: 40px 24px;
-    text-align: center;
-    color: var(--muted);
-    font-size: 14px;
-    line-height: 1.6;
-  }
-  .empty svg { opacity: .4; margin-bottom: 12px; }
+  .empty { padding:36px 22px; text-align:center; color:var(--muted); font-size:14px; line-height:1.6; }
 
-  /* Drag overlay */
   #drop-overlay {
-    position: fixed; inset: 0;
-    background: rgba(15,20,25,.85);
-    border: 3px dashed var(--accent);
-    display: none;
-    align-items: center; justify-content: center;
-    z-index: 9999;
-    font-size: 22px; font-weight: 700;
-    color: var(--accent);
+    position:fixed; inset:0; background:rgba(15,20,25,.85); border:3px dashed #ff6b35;
+    display:none; align-items:center; justify-content:center; z-index:9999; font-size:22px; font-weight:700; color:#ff6b35;
   }
-  body.dragging #drop-overlay { display: flex; }
+  body.dragging #drop-overlay { display:flex; }
 
-  /* Numbered marker */
-  .rp-marker {
-    background: var(--accent);
-    color: #fff;
-    border: 2px solid #fff;
-    border-radius: 50%;
-    width: 28px; height: 28px;
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 700; font-size: 13px;
-    box-shadow: 0 1px 4px rgba(0,0,0,.5);
-  }
-  .rp-marker.mini { background: var(--accent-2); }
+  .ev-marker { border:2px solid #fff; border-radius:50%; width:26px; height:26px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; color:#fff; box-shadow:0 1px 4px rgba(0,0,0,.5); }
+  .spinner { display:inline-block; width:14px; height:14px; border:2px solid var(--muted); border-top-color:transparent; border-radius:50%; animation:spin .7s linear infinite; vertical-align:-2px; margin-right:6px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
 
-  .spinner {
-    display: inline-block; width: 14px; height: 14px;
-    border: 2px solid var(--muted); border-top-color: transparent;
-    border-radius: 50%; animation: spin .7s linear infinite;
-    vertical-align: -2px; margin-right: 6px;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  @media (max-width: 720px) {
-    .main { flex-direction: column; }
-    .sidebar { width: 100%; max-width: none; height: 45%; border-left: none; border-top: 1px solid var(--border); }
-    #map { height: 55%; }
+  @media (max-width:720px) {
+    .main { flex-direction:column; }
+    .sidebar { width:100%; max-width:none; height:52%; border-left:none; border-top:1px solid var(--border); }
+    #map { height:48%; }
   }
 </style>
 </head>
@@ -865,26 +760,25 @@ svg.leaflet-image-layer.leaflet-interactive path {
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
       Charger un GPX
     </label>
-    <!-- Pas d'attribut accept : sur iOS un filtre .gpx grise le fichier et le rend
-         inélectionnable. On accepte tout et parseTrack valide le contenu. -->
     <input type="file" id="fileInput" />
-    <span class="hint" id="fileHint">Aucun fichier — glisse ton .gpx ici ou clique sur le bouton</span>
+    <span class="hint" id="fileHint">Aucun fichier — glisse ton .gpx / .kml ici</span>
   </header>
 
   <div class="main">
     <div id="map"></div>
     <aside class="sidebar">
       <div class="summary">
-        <div class="stat"><div class="value accent" id="statCount">—</div><div class="label">Ronds-points</div></div>
         <div class="stat"><div class="value" id="statDist">—</div><div class="label">Distance totale</div></div>
+        <div class="stat"><div class="value" id="statCurves">—</div><div class="label">Nombre de virages</div></div>
+      </div>
+      <div class="layers">
+        <h2>Événements à afficher</h2>
+        <div id="layerList"></div>
       </div>
       <div class="table-wrap">
-        <div class="empty" id="emptyState">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="9"/></svg>
-          <div>Charge une trace GPX pour détecter<br>les ronds-points du parcours.</div>
-        </div>
+        <div class="empty" id="emptyState">Charge une trace GPX/KML pour détecter<br>les événements du parcours.</div>
         <table id="tableBox" style="display:none">
-          <thead><tr><th>#</th><th>Km</th><th>Type</th></tr></thead>
+          <thead><tr><th>Type</th><th>Km</th><th>Détail</th></tr></thead>
           <tbody id="tableBody"></tbody>
         </table>
       </div>
@@ -892,7 +786,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     </aside>
   </div>
 
-  <div id="drop-overlay">Dépose ton fichier GPX</div>
+  <div id="drop-overlay">Dépose ton fichier GPX / KML</div>
 
 <script id="leaflet-js">
 /* @preserve
@@ -906,388 +800,407 @@ svg.leaflet-image-layer.leaflet-interactive path {
 (function () {
   "use strict";
 
-  // ---------- Map setup (défensif : ne doit jamais bloquer le chargement GPX) ----------
-  let map = null, trackLayer = null, markersLayer = null;
-  const markerById = {};
+  // ============================ Registre des événements ============================
+  const TYPES = {
+    curve:       { label:'Virages',                            color:'#56d364', kind:'point', def:false },
+    twisty:      { label:'Successions de virages',             color:'#e3b341', kind:'span',  def:true  },
+    roundabout:  { label:'Ronds-points',                       color:'#ff6b35', kind:'point', def:true  },
+    interchange: { label:'Échangeurs',                         color:'#a371f7', kind:'point', def:true  },
+    turn_curve:  { label:'Intersection prise en virage',       color:'#f778ba', kind:'point', def:true  },
+    cross_curve: { label:'Intersection traversée en virage',   color:'#3fb0ff', kind:'point', def:true  },
+    bad_road:    { label:'Route dégradée (sans marquage)',     color:'#8b949e', kind:'span',  def:true  },
+  };
+  const ORDER = ['roundabout','turn_curve','cross_curve','interchange','twisty','bad_road','curve'];
+
+  // ============================ Carte ============================
+  let map=null, trackLayer=null;
+  const layerGroups = {}; // type -> L.layerGroup
+  const enabled = {};     // type -> bool
+  let events = {};        // type -> [event]
   const hasLeaflet = typeof L !== 'undefined';
   if (hasLeaflet) {
     try {
-      map = L.map('map', { zoomControl: true }).setView([46.6, 2.5], 6); // France par défaut
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap'
-      }).addTo(map);
-      markersLayer = L.layerGroup().addTo(map);
-    } catch (e) { console.error('Init carte:', e); }
+      map = L.map('map', { zoomControl:true }).setView([46.6,2.5], 6);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'&copy; OpenStreetMap' }).addTo(map);
+      for (const t of ORDER) layerGroups[t] = L.layerGroup();
+    } catch(e){ console.error('Init carte', e); }
   }
 
   const els = {
-    status: document.getElementById('status'),
-    statCount: document.getElementById('statCount'),
-    statDist: document.getElementById('statDist'),
-    tableBody: document.getElementById('tableBody'),
-    tableBox: document.getElementById('tableBox'),
-    emptyState: document.getElementById('emptyState'),
-    fileHint: document.getElementById('fileHint'),
+    status:document.getElementById('status'), statDist:document.getElementById('statDist'),
+    statCurves:document.getElementById('statCurves'), tableBody:document.getElementById('tableBody'),
+    tableBox:document.getElementById('tableBox'), emptyState:document.getElementById('emptyState'),
+    fileHint:document.getElementById('fileHint'), layerList:document.getElementById('layerList'),
   };
+  function setStatus(msg, cls){ els.status.className='status'+(cls?' '+cls:''); els.status.innerHTML=msg||''; }
 
-  function setStatus(msg, cls) {
-    els.status.className = 'status' + (cls ? ' ' + cls : '');
-    els.status.innerHTML = msg || '';
+  // ============================ Géo ============================
+  const R=6371000, toRad=d=>d*Math.PI/180, toDeg=r=>r*180/Math.PI;
+  function haversine(a,b){
+    const dLat=toRad(b.lat-a.lat), dLon=toRad(b.lon-a.lon), la1=toRad(a.lat), la2=toRad(b.lat);
+    const h=Math.sin(dLat/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;
+    return 2*R*Math.asin(Math.min(1,Math.sqrt(h)));
   }
-
-  // ---------- Geo helpers ----------
-  const R = 6371000; // rayon terre (m)
-  const toRad = d => d * Math.PI / 180;
-
-  function haversine(a, b) {
-    const dLat = toRad(b.lat - a.lat);
-    const dLon = toRad(b.lon - a.lon);
-    const la1 = toRad(a.lat), la2 = toRad(b.lat);
-    const h = Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;
-    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+  function bearing(a,b){
+    const la1=toRad(a.lat), la2=toRad(b.lat), dLon=toRad(b.lon-a.lon);
+    const y=Math.sin(dLon)*Math.cos(la2);
+    const x=Math.cos(la1)*Math.sin(la2)-Math.sin(la1)*Math.cos(la2)*Math.cos(dLon);
+    return (toDeg(Math.atan2(y,x))+360)%360;
   }
+  function angleDiff(a,b){ let d=((b-a+540)%360)-180; return d; } // signé [-180,180]
+  function makeProjector(refLat){ const cos=Math.cos(toRad(refLat)); return p=>({x:toRad(p.lon)*R*cos, y:toRad(p.lat)*R}); }
 
-  // Projection locale (équirectangulaire) en mètres autour d'une latitude de référence
-  function makeProjector(refLat) {
-    const cos = Math.cos(toRad(refLat));
-    return p => ({ x: toRad(p.lon) * R * cos, y: toRad(p.lat) * R });
-  }
-
-  // ---------- Parsing multi-format (GPX + KML/Google Maps) ----------
-  function parseTrack(text) {
-    if (/^PK\x03\x04/.test(text)) {
-      throw new Error('Fichier KMZ compressé détecté. Dézippe-le (renomme en .zip) et charge le .kml qu\'il contient.');
-    }
-    const xml = new DOMParser().parseFromString(text, 'application/xml');
+  // ============================ Parsing GPX/KML ============================
+  function parseTrack(text){
+    if (/^PK\x03\x04/.test(text)) throw new Error('Fichier KMZ compressé. Dézippe-le et charge le .kml.');
+    const xml=new DOMParser().parseFromString(text,'application/xml');
     if (xml.querySelector('parsererror')) throw new Error('Fichier illisible (XML/GPX/KML invalide).');
-
-    const inBounds = (lat, lon) => isFinite(lat) && isFinite(lon) &&
-      Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
-    const finite = p => inBounds(p.lat, p.lon);
-
-    // 1) GPX : <trkpt> / <rtept> (attributs lat/lon)
-    let nodes = Array.from(xml.getElementsByTagName('trkpt'));
-    if (nodes.length === 0) nodes = Array.from(xml.getElementsByTagName('rtept'));
-    let pts = nodes.map(n => ({
-      lat: parseFloat(n.getAttribute('lat')),
-      lon: parseFloat(n.getAttribute('lon'))
-    })).filter(finite);
-
-    // 2) KML / Google Maps : <coordinates> (lon,lat[,alt] séparés par des espaces)
-    //    et <gx:coord> (lon lat alt). On parcourt par localName (sans se soucier des namespaces).
-    if (pts.length < 2) {
-      const kml = [];
-      for (const el of xml.getElementsByTagName('*')) {
-        const name = el.localName || el.nodeName;
-        if (name === 'coordinates') {
-          el.textContent.trim().split(/\s+/).forEach(t => {
-            const a = t.split(',');
-            const lon = parseFloat(a[0]), lat = parseFloat(a[1]);
-            if (inBounds(lat, lon)) kml.push({ lat, lon });
-          });
-        } else if (name === 'coord') { // gx:coord
-          const a = el.textContent.trim().split(/\s+/);
-          const lon = parseFloat(a[0]), lat = parseFloat(a[1]);
-          if (inBounds(lat, lon)) kml.push({ lat, lon });
-        }
+    const inB=(lat,lon)=>isFinite(lat)&&isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180;
+    let nodes=Array.from(xml.getElementsByTagName('trkpt'));
+    if(!nodes.length) nodes=Array.from(xml.getElementsByTagName('rtept'));
+    let pts=nodes.map(n=>({lat:parseFloat(n.getAttribute('lat')),lon:parseFloat(n.getAttribute('lon'))})).filter(p=>inB(p.lat,p.lon));
+    if(pts.length<2){
+      const kml=[];
+      for(const el of xml.getElementsByTagName('*')){
+        const nm=el.localName||el.nodeName;
+        if(nm==='coordinates'){ el.textContent.trim().split(/\s+/).forEach(t=>{const a=t.split(','),lon=parseFloat(a[0]),lat=parseFloat(a[1]); if(inB(lat,lon)) kml.push({lat,lon});}); }
+        else if(nm==='coord'){ const a=el.textContent.trim().split(/\s+/),lon=parseFloat(a[0]),lat=parseFloat(a[1]); if(inB(lat,lon)) kml.push({lat,lon}); }
       }
-      if (kml.length >= 2) pts = kml;
+      if(kml.length>=2) pts=kml;
     }
-
-    // 3) Dernier recours : waypoints GPX isolés
-    if (pts.length < 2) {
-      pts = Array.from(xml.getElementsByTagName('wpt')).map(n => ({
-        lat: parseFloat(n.getAttribute('lat')),
-        lon: parseFloat(n.getAttribute('lon'))
-      })).filter(finite);
-    }
-
-    if (pts.length < 2) {
-      throw new Error('Aucun tracé trouvé dans le fichier. Formats acceptés : GPX (.gpx) ou KML (.kml). ' +
-        'Un lien/export Google Maps doit être exporté en « KML » (pas KMZ).');
-    }
+    if(pts.length<2) throw new Error('Aucun tracé trouvé. Formats acceptés : GPX (.gpx) ou KML (.kml).');
     return pts;
   }
-
-  // Distance cumulée + longueur des segments
-  function buildDistances(pts) {
-    const cum = [0];
-    const seg = [];
-    for (let i = 1; i < pts.length; i++) {
-      const d = haversine(pts[i-1], pts[i]);
-      seg.push(d);
-      cum.push(cum[i-1] + d);
-    }
-    return { cum, seg, total: cum[cum.length - 1] };
+  function buildDistances(pts){
+    const cum=[0], seg=[];
+    for(let i=1;i<pts.length;i++){ const d=haversine(pts[i-1],pts[i]); seg.push(d); cum.push(cum[i-1]+d); }
+    return { cum, seg, total:cum[cum.length-1] };
   }
 
-  // Point le plus proche du tracé -> renvoie la distance (m) et le km cumulé
-  // projPts : points du tracé déjà projetés (calculés une seule fois en amont)
-  function nearestOnTrack(target, projPts, dist, project) {
-    const T = project(target);
-    let best = { d2: Infinity, meters: 0 };
-    for (let i = 0; i < projPts.length - 1; i++) {
-      const A = projPts[i];
-      const B = projPts[i+1];
-      const dx = B.x - A.x, dy = B.y - A.y;
-      const len2 = dx*dx + dy*dy;
-      let t = len2 ? ((T.x - A.x)*dx + (T.y - A.y)*dy) / len2 : 0;
-      t = Math.max(0, Math.min(1, t));
-      const px = A.x + t*dx, py = A.y + t*dy;
-      const d2 = (T.x-px)**2 + (T.y-py)**2;
-      if (d2 < best.d2) {
-        best = { d2, meters: dist.cum[i] + t * dist.seg[i] };
+  // Ré-échantillonnage à pas constant (mètres) pour analyse géométrique stable
+  function resample(pts, step){
+    const out=[pts[0]]; let acc=0;
+    for(let i=1;i<pts.length;i++){
+      let d=haversine(pts[i-1],pts[i]);
+      if(d===0) continue;
+      let prev=pts[i-1];
+      while(acc+d>=step){
+        const need=step-acc, f=need/d;
+        const np={ lat:prev.lat+(pts[i].lat-prev.lat)*f, lon:prev.lon+(pts[i].lon-prev.lon)*f };
+        out.push(np); prev=np; d=haversine(prev,pts[i]); acc=0;
       }
+      acc+=d;
     }
-    return { dist: Math.sqrt(best.d2), meters: best.meters };
+    out.push(pts[pts.length-1]);
+    return out;
   }
 
-  // ---------- Overpass ----------
-  const OVERPASS_ENDPOINTS = [
-    'https://overpass-api.de/api/interpreter',
-    'https://overpass.kumi.systems/api/interpreter',
-    'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
-  ];
+  // Projection d'un point sur le tracé -> {dist(m), meters(km cumulés)}
+  function nearestOnTrack(target, projPts, dist, project){
+    const T=project(target); let best={d2:Infinity,meters:0};
+    for(let i=0;i<projPts.length-1;i++){
+      const A=projPts[i], B=projPts[i+1], dx=B.x-A.x, dy=B.y-A.y, len2=dx*dx+dy*dy;
+      let t=len2?((T.x-A.x)*dx+(T.y-A.y)*dy)/len2:0; t=Math.max(0,Math.min(1,t));
+      const px=A.x+t*dx, py=A.y+t*dy, d2=(T.x-px)**2+(T.y-py)**2;
+      if(d2<best.d2) best={d2, meters:dist.cum[i]+t*dist.seg[i]};
+    }
+    return { dist:Math.sqrt(best.d2), meters:best.meters };
+  }
 
-  // Découpe le tracé en zones (bounding-box) successives : de petites requêtes
-  // rapides et fiables, plutôt qu'une seule requête géante qui expire sur un
-  // long parcours (surtout en 4G).
-  function buildBboxTiles(pts, tileSize, padDeg) {
-    const tiles = [];
-    for (let i = 0; i < pts.length; i += tileSize) {
-      const slice = pts.slice(i, Math.min(pts.length, i + tileSize + 1));
-      let s = Infinity, w = Infinity, n = -Infinity, e = -Infinity;
-      for (const p of slice) {
-        if (p.lat < s) s = p.lat; if (p.lat > n) n = p.lat;
-        if (p.lon < w) w = p.lon; if (p.lon > e) e = p.lon;
-      }
-      tiles.push([s - padDeg, w - padDeg, n + padDeg, e + padDeg]);
+  // ============================ Analyse géométrique (virages) ============================
+  const STEP=12;            // pas de ré-échantillonnage (m)
+  const PER_SEG=3;          // seuil de rotation par pas (deg) pour être "en virage"
+  const STRAIGHT_GAP=36;    // longueur droite (m) qui clôt un virage
+  const MIN_CURVE_DEG=32;   // rotation cumulée mini pour compter un virage
+
+  function detectCurves(res){
+    const rcum=[0]; for(let i=1;i<res.length;i++) rcum.push(rcum[i-1]+haversine(res[i-1],res[i]));
+    const head=[]; for(let i=0;i<res.length-1;i++) head.push(bearing(res[i],res[i+1]));
+    const curves=[]; let cur=null, straight=0;
+    const close=()=>{ if(cur && cur.sum>=MIN_CURVE_DEG){ const mid=Math.round((cur.i0+cur.i1)/2);
+      curves.push({ startM:rcum[cur.i0], endM:rcum[Math.min(cur.i1+1,res.length-1)], lat:res[mid].lat, lon:res[mid].lon, deg:cur.sum, dir:cur.signed>0?'droite':'gauche' }); } cur=null; };
+    for(let i=1;i<head.length;i++){
+      const d=angleDiff(head[i-1],head[i]), ad=Math.abs(d);
+      if(ad>=PER_SEG){ if(!cur) cur={i0:i,sum:0,signed:0}; cur.sum+=ad; cur.signed+=d; cur.i1=i; straight=0; }
+      else if(cur){ straight+=STEP; if(straight>=STRAIGHT_GAP) close(); }
+    }
+    close();
+    return { curves, rcum, res };
+  }
+  function detectTwisty(curves){
+    const GAP=180; const groups=[]; let g=null;
+    for(const c of curves){
+      if(g && c.startM-g.endM<=GAP){ g.endM=c.endM; g.count++; g.curves.push(c); }
+      else { if(g && g.count>=3) groups.push(g); g={startM:c.startM, endM:c.endM, count:1, curves:[c]}; }
+    }
+    if(g && g.count>=3) groups.push(g);
+    return groups.map(g=>{ const m=g.curves[Math.floor(g.curves.length/2)]; return { startM:g.startM, endM:g.endM, count:g.count, lat:m.lat, lon:m.lon }; });
+  }
+  // Rotation du tracé autour d'une position (km) sur une fenêtre ± win (m)
+  function headingChangeAt(meters, win, geo){
+    const {res,rcum}=geo; const at=m=>{ let lo=0,hi=rcum.length-1; while(lo<hi){const mid=(lo+hi)>>1; if(rcum[mid]<m) lo=mid+1; else hi=mid;} return Math.max(0,Math.min(res.length-1,lo)); };
+    const a=at(meters-win), b=at(meters), c=at(meters+win);
+    if(a>=b||b>=c) return 0;
+    return Math.abs(angleDiff(bearing(res[a],res[b]), bearing(res[b],res[c])));
+  }
+
+  // ============================ Overpass (zone par zone) ============================
+  const OVERPASS=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+  let opCursor=0;
+  async function queryOverpass(q, timeoutMs=45000){
+    let lastErr; const order=OVERPASS.map((_,i)=>OVERPASS[(opCursor+i)%OVERPASS.length]); opCursor++;
+    for(const url of order){
+      const ctrl=new AbortController(); const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+      try{ const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(q),signal:ctrl.signal});
+        clearTimeout(timer); if(!res.ok) throw new Error('HTTP '+res.status); return await res.json();
+      }catch(e){ clearTimeout(timer); lastErr=e; }
+    }
+    throw new Error('OSM injoignable ('+(lastErr&&lastErr.message)+')');
+  }
+  function bboxTiles(pts, tileSize, pad){
+    const tiles=[];
+    for(let i=0;i<pts.length;i+=tileSize){
+      const s=pts.slice(i,Math.min(pts.length,i+tileSize+1));
+      let mnLat=Infinity,mnLon=Infinity,mxLat=-Infinity,mxLon=-Infinity;
+      for(const p of s){ if(p.lat<mnLat)mnLat=p.lat; if(p.lat>mxLat)mxLat=p.lat; if(p.lon<mnLon)mnLon=p.lon; if(p.lon>mxLon)mxLon=p.lon; }
+      tiles.push([mnLat-pad,mnLon-pad,mxLat+pad,mxLon+pad]);
     }
     return tiles;
   }
-
-  function buildTileQuery(bbox) {
-    const b = bbox.map(x => x.toFixed(6));
-    const box = `(${b[0]},${b[1]},${b[2]},${b[3]})`;
-    return `[out:json][timeout:60];(` +
-      `way["junction"~"^(roundabout|circular)$"]${box};` +
-      `node["highway"="mini_roundabout"]${box};` +
+  const HW='^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|road|track|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link)$';
+  function tileQuery(b){
+    const x=b.map(v=>v.toFixed(6)), box=`(${x[0]},${x[1]},${x[2]},${x[3]})`;
+    return `[out:json][timeout:60];(`+
+      `way["highway"~"${HW}"]${box};`+
+      `node["highway"="motorway_junction"]${box};`+
+      `node["highway"="mini_roundabout"]${box};`+
     `);out geom;`;
   }
 
-  // Interroge les miroirs Overpass à tour de rôle, avec délai maximal par essai.
-  let opCursor = 0;
-  async function queryOverpass(query, timeoutMs = 45000) {
-    let lastErr;
-    const order = OVERPASS_ENDPOINTS.map((_, i) =>
-      OVERPASS_ENDPOINTS[(opCursor + i) % OVERPASS_ENDPOINTS.length]);
-    opCursor++;
-    for (const url of order) {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-      try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: 'data=' + encodeURIComponent(query),
-          signal: ctrl.signal
-        });
-        clearTimeout(timer);
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return await res.json();
-      } catch (e) { clearTimeout(timer); lastErr = e; }
-    }
-    throw new Error('Serveur OpenStreetMap injoignable (' + (lastErr && lastErr.message) + ').');
+  const BAD_SURF=new Set(['unpaved','gravel','fine_gravel','compacted','dirt','ground','earth','sand','grass','mud','pebblestone','rock']);
+
+  // ============================ Rendu ============================
+  function fmtDist(m){ return m>=1000?(m/1000).toFixed(m>=10000?0:1)+' km':Math.round(m)+' m'; }
+  function evMarker(type, text){
+    return L.divIcon({ className:'', html:`<div class="ev-marker" style="background:${TYPES[type].color}">${text||''}</div>`, iconSize:[26,26], iconAnchor:[13,13] });
+  }
+  function clearAll(){
+    for(const t of ORDER){ if(layerGroups[t]) layerGroups[t].clearLayers(); }
+    els.tableBody.innerHTML='';
   }
 
-  function elementCentroid(el) {
-    if (el.type === 'node') return { lat: el.lat, lon: el.lon };
-    const g = el.geometry || [];
-    let sLat = 0, sLon = 0, n = 0;
-    for (const p of g) { if (p) { sLat += p.lat; sLon += p.lon; n++; } }
-    return n ? { lat: sLat/n, lon: sLon/n } : null;
-  }
-
-  // ---------- Rendu ----------
-  function fmtDist(m) {
-    return m >= 1000 ? (m/1000).toFixed(m >= 10000 ? 0 : 1) + ' km' : Math.round(m) + ' m';
-  }
-
-  function clearResults() {
-    if (markersLayer) markersLayer.clearLayers();
-    els.tableBody.innerHTML = '';
-    for (const k in markerById) delete markerById[k];
-  }
-
-  function render(roundabouts, total) {
-    clearResults();
-    els.statCount.textContent = roundabouts.length;
-    els.statDist.textContent = fmtDist(total);
-
-    if (roundabouts.length === 0) {
-      els.tableBox.style.display = 'none';
-      els.emptyState.style.display = 'block';
-      els.emptyState.querySelector('div:last-child').innerHTML =
-        'Aucun rond-point détecté sur ce parcours.';
-      return;
-    }
-    els.emptyState.style.display = 'none';
-    els.tableBox.style.display = 'table';
-
-    roundabouts.forEach((rp, idx) => {
-      const n = idx + 1;
-      const isMini = rp.type === 'mini';
-      const icon = L.divIcon({
-        className: '',
-        html: `<div class="rp-marker${isMini ? ' mini' : ''}">${n}</div>`,
-        iconSize: [28, 28], iconAnchor: [14, 14]
-      });
-      let m = null;
-      if (map && markersLayer) {
-        m = L.marker([rp.lat, rp.lon], { icon }).addTo(markersLayer);
-        m.bindPopup(`<b>Rond-point n°${n}</b><br>Km ${(rp.meters/1000).toFixed(2)}<br>${rp.label}`);
-        markerById[n] = m;
-      }
-
-      const tr = document.createElement('tr');
-      tr.innerHTML =
-        `<td><span class="badge${isMini ? ' mini' : ''}">${n}</span></td>` +
-        `<td class="km">${(rp.meters/1000).toFixed(2)}</td>` +
-        `<td class="type-tag">${rp.label}</td>`;
-      tr.addEventListener('click', () => {
-        if (map && m) { map.setView([rp.lat, rp.lon], 17, { animate: true }); m.openPopup(); }
-      });
-      els.tableBody.appendChild(tr);
-    });
-  }
-
-  // ---------- Pipeline principal ----------
-  async function process(text) {
-    try {
-      const banner = document.getElementById('errBanner');
-      if (banner) banner.style.display = 'none';
-      setStatus('<span class="spinner"></span>Lecture de la trace…');
-      const pts = parseTrack(text);
-      const dist = buildDistances(pts);
-
-      // Retour immédiat : la trace est lue, on l'affiche AVANT toute requête réseau
-      els.statDist.textContent = fmtDist(dist.total);
-      els.statCount.textContent = '…';
-
-      // Affiche la trace
-      if (map) {
-        if (trackLayer) map.removeLayer(trackLayer);
-        const latlngs = pts.map(p => [p.lat, p.lon]);
-        trackLayer = L.polyline(latlngs, { color: '#ff6b35', weight: 4, opacity: .9 }).addTo(map);
-        try { map.fitBounds(trackLayer.getBounds(), { padding: [30, 30] }); } catch (e) {}
-        setTimeout(() => { try { map.invalidateSize(); } catch (e) {} }, 200);
-      }
-
-      setStatus(`<span class="spinner"></span>Trace lue : ${pts.length} points, ${fmtDist(dist.total)}. Recherche des ronds-points…`);
-
-      const refLat = pts[Math.floor(pts.length/2)].lat;
-      const project = makeProjector(refLat);
-      const projPts = pts.map(project); // projeté une seule fois (perf)
-
-      // Interroge OpenStreetMap zone par zone le long du parcours
-      const tiles = buildBboxTiles(pts, 250, 0.0012); // ~250 pts/zone, marge ~130 m
-      const elements = new Map();
-      let okTiles = 0, failTiles = 0;
-      for (let t = 0; t < tiles.length; t++) {
-        setStatus(`<span class="spinner"></span>Recherche des ronds-points… zone ${t+1}/${tiles.length}`);
-        try {
-          const data = await queryOverpass(buildTileQuery(tiles[t]));
-          for (const el of (data.elements || [])) elements.set(el.type + '/' + el.id, el);
-          okTiles++;
-        } catch (e) { failTiles++; console.warn('zone', t+1, e.message); }
-      }
-      if (okTiles === 0) throw new Error('Serveur OpenStreetMap injoignable — réessaie dans un instant.');
-
-      // Ne garde que les ronds-points réellement sur le tracé
-      const roundabouts = [];
-      for (const el of elements.values()) {
-        const c = elementCentroid(el);
-        if (!c) continue;
-        const near = nearestOnTrack(c, projPts, dist, project);
-        let onRoute = near.dist <= 40;
-        // grands giratoires : le tracé longe l'anneau, teste la distance aux sommets
-        if (!onRoute && near.dist <= 150 && el.geometry) {
-          for (const g of el.geometry) {
-            if (g && nearestOnTrack(g, projPts, dist, project).dist <= 30) { onRoute = true; break; }
-          }
+  function drawEvents(){
+    if(!map) return;
+    for(const t of ORDER){
+      const lg=layerGroups[t]; if(!lg) continue; lg.clearLayers();
+      (events[t]||[]).forEach((ev,idx)=>{
+        if(TYPES[t].kind==='span' && ev.path && ev.path.length>1){
+          L.polyline(ev.path.map(p=>[p.lat,p.lon]), { color:TYPES[t].color, weight:7, opacity:.85 }).addTo(lg);
         }
-        if (!onRoute) continue;
-        const tags = el.tags || {};
-        const isMini = tags.highway === 'mini_roundabout';
-        const label = isMini ? 'Mini rond-point'
-          : (tags.junction === 'circular' ? 'Giratoire' : 'Rond-point');
-        roundabouts.push({
-          lat: c.lat, lon: c.lon,
-          meters: near.meters,
-          type: isMini ? 'mini' : 'normal',
-          label
-        });
+        const m=L.marker([ev.lat,ev.lon], { icon:evMarker(t, ev.badge||'') }).addTo(lg);
+        m.bindPopup(`<b>${TYPES[t].label}</b><br>Km ${(ev.meters/1000).toFixed(2)}${ev.detail?'<br>'+ev.detail:''}`);
+        ev._marker=m;
+      });
+    }
+  }
+  function applyLayerVisibility(){
+    if(!map) return;
+    for(const t of ORDER){
+      if(!layerGroups[t]) continue;
+      if(enabled[t]) layerGroups[t].addTo(map); else map.removeLayer(layerGroups[t]);
+    }
+  }
+  function renderLayerList(){
+    els.layerList.innerHTML='';
+    for(const t of ORDER){
+      const n=(events[t]||[]).length;
+      const row=document.createElement('label');
+      row.className='layer-row'+(n===0?' disabled':'');
+      row.innerHTML=`<input type="checkbox" ${enabled[t]&&n>0?'checked':''} ${n===0?'disabled':''}>`+
+        `<span class="swatch" style="background:${TYPES[t].color}"></span>`+
+        `<span class="name">${TYPES[t].label}</span>`+
+        `<span class="count">${n}</span>`;
+      row.querySelector('input').addEventListener('change', e=>{
+        enabled[t]=e.target.checked; applyLayerVisibility(); renderTable();
+      });
+      els.layerList.appendChild(row);
+    }
+  }
+  function renderTable(){
+    const rows=[];
+    for(const t of ORDER){ if(!enabled[t]) continue; for(const ev of (events[t]||[])) rows.push({t,ev}); }
+    rows.sort((a,b)=>a.ev.meters-b.ev.meters);
+    els.tableBody.innerHTML='';
+    if(rows.length===0){ els.tableBox.style.display='none'; els.emptyState.style.display='block';
+      els.emptyState.innerHTML='Aucun événement à afficher.<br>Coche un type ci-dessus.'; return; }
+    els.emptyState.style.display='none'; els.tableBox.style.display='table';
+    for(const {t,ev} of rows){
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td><span class="ev-dot" style="background:${TYPES[t].color}"></span><span class="ev-type">${TYPES[t].label}</span></td>`+
+        `<td class="km">${(ev.meters/1000).toFixed(2)}</td>`+
+        `<td class="ev-type">${ev.detail||''}</td>`;
+      tr.addEventListener('click',()=>{ if(map){ map.setView([ev.lat,ev.lon],16,{animate:true}); if(ev._marker) ev._marker.openPopup(); } });
+      els.tableBody.appendChild(tr);
+    }
+  }
+
+  // ============================ Pipeline ============================
+  async function process(text){
+    try{
+      const banner=document.getElementById('errBanner'); if(banner) banner.style.display='none';
+      setStatus('<span class="spinner"></span>Lecture de la trace…');
+      const pts=parseTrack(text);
+      const dist=buildDistances(pts);
+      els.statDist.textContent=fmtDist(dist.total); els.statCurves.textContent='…';
+
+      if(map){
+        if(trackLayer) map.removeLayer(trackLayer);
+        trackLayer=L.polyline(pts.map(p=>[p.lat,p.lon]),{color:'#ff6b35',weight:3,opacity:.85}).addTo(map);
+        try{ map.fitBounds(trackLayer.getBounds(),{padding:[30,30]}); }catch(e){}
+        setTimeout(()=>{ try{ map.invalidateSize(); }catch(e){} },200);
       }
-      roundabouts.sort((a, b) => a.meters - b.meters);
 
-      render(roundabouts, dist.total);
-      const warn = failTiles ? ` — ⚠️ ${failTiles} zone(s) non chargée(s) (réseau), résultat peut-être incomplet` : '';
-      setStatus(`${roundabouts.length} rond(s)-point(s) sur ${fmtDist(dist.total)}${warn}.`, failTiles ? 'error' : 'ok');
-    } catch (e) {
-      console.error(e);
-      // Erreur réseau (recherche ronds-points) : la trace peut déjà être affichée
-      const net = /Overpass|injoignable|HTTP|Failed to fetch|NetworkError/i.test(e.message);
-      setStatus('⚠️ ' + e.message + (net ? ' — vérifie ta connexion internet.' : ''), 'error');
-      showBanner(e.message);
+      const project=makeProjector(pts[Math.floor(pts.length/2)].lat);
+      const projPts=pts.map(project);
+
+      // --- Géométrie (hors ligne) ---
+      const res=resample(pts, STEP);
+      const geo=detectCurves(res);
+      els.statCurves.textContent=geo.curves.length;
+      events={ curve:[], twisty:[], roundabout:[], interchange:[], turn_curve:[], cross_curve:[], bad_road:[] };
+      geo.curves.forEach((c,i)=>events.curve.push({ lat:c.lat, lon:c.lon, meters:c.startM, badge:'', detail:`${Math.round(c.deg)}° à ${c.dir}` }));
+      detectTwisty(geo.curves).forEach(g=>{
+        events.twisty.push({ lat:g.lat, lon:g.lon, meters:g.startM, detail:`${g.count} virages sur ${fmtDist(g.endM-g.startM)}`, path:spanPath(res, geo.rcum, g.startM, g.endM) });
+      });
+
+      // --- OSM (zone par zone) ---
+      setStatus(`<span class="spinner"></span>Trace lue : ${pts.length} points, ${fmtDist(dist.total)}. Analyse OpenStreetMap…`);
+      const tiles=bboxTiles(pts, 250, 0.0012);
+      const ways=[]; const wayseen=new Set(); const nodePts=new Map(); const nodeDeg=new Map(); const juncNodes=[]; const miniNodes=[];
+      let okT=0, failT=0;
+      for(let i=0;i<tiles.length;i++){
+        setStatus(`<span class="spinner"></span>Analyse OpenStreetMap… zone ${i+1}/${tiles.length}`);
+        try{
+          const data=await queryOverpass(tileQuery(tiles[i])); okT++;
+          for(const el of (data.elements||[])){
+            if(el.type==='node'){
+              if(el.tags&&el.tags.highway==='motorway_junction') juncNodes.push(el);
+              else if(el.tags&&el.tags.highway==='mini_roundabout') miniNodes.push(el);
+            } else if(el.type==='way' && el.geometry && el.nodes){
+              if(wayseen.has(el.id)) continue; wayseen.add(el.id); // zones chevauchantes
+              ways.push(el);
+              for(let j=0;j<el.nodes.length;j++){
+                const id=el.nodes[j], g=el.geometry[j]; if(!g) continue;
+                nodePts.set(id,g);
+                const inc=(j===0||j===el.nodes.length-1)?1:2;
+                nodeDeg.set(id,(nodeDeg.get(id)||0)+inc);
+              }
+            }
+          }
+        }catch(e){ failT++; console.warn('zone',i+1,e.message); }
+      }
+      if(okT===0) throw new Error('Serveur OpenStreetMap injoignable — réessaie dans un instant.');
+
+      const near=t=>nearestOnTrack(t,projPts,dist,project);
+      const seen=new Set();
+
+      // Ronds-points (ways junction + node mini)
+      for(const w of ways){
+        const j=w.tags&&w.tags.junction;
+        if(j==='roundabout'||j==='circular'){
+          const key='w'+w.id; if(seen.has(key))continue; seen.add(key);
+          const c=centroid(w.geometry); const nr=near(c);
+          let on=nr.dist<=40; if(!on&&nr.dist<=150){ for(const g of w.geometry){ if(near(g).dist<=30){on=true;break;} } }
+          if(on) events.roundabout.push({ lat:c.lat, lon:c.lon, meters:nr.meters, detail:j==='circular'?'Giratoire':'Rond-point' });
+        }
+      }
+      for(const nd of miniNodes){ const nr=near(nd); if(nr.dist<=25){ const key='n'+nd.id; if(seen.has(key))continue; seen.add(key);
+        events.roundabout.push({ lat:nd.lat, lon:nd.lon, meters:nr.meters, detail:'Mini rond-point' }); } }
+
+      // Échangeurs
+      for(const nd of juncNodes){ const nr=near(nd); if(nr.dist<=90){ const key='j'+nd.id; if(seen.has(key))continue; seen.add(key);
+        const ref=nd.tags&&(nd.tags.ref||nd.tags.name)||''; events.interchange.push({ lat:nd.lat, lon:nd.lon, meters:nr.meters, detail:ref?('Sortie '+ref):'Échangeur' }); } }
+
+      // Routes dégradées sans marquage
+      for(const w of ways){
+        const tg=w.tags||{};
+        const bad = tg.lane_markings==='no' || (tg.surface&&BAD_SURF.has(tg.surface)) || (tg.highway==='track');
+        if(!bad) continue;
+        const run=onTrackRun(w.geometry, near, 22);
+        if(run){ const detail=(tg.lane_markings==='no'?'Sans marquage':'')+(tg.surface?(tg.lane_markings==='no'?' · ':'')+tg.surface:'') || 'Route dégradée';
+          events.bad_road.push({ lat:run.path[Math.floor(run.path.length/2)].lat, lon:run.path[Math.floor(run.path.length/2)].lon, meters:run.startM, detail, path:run.path }); }
+      }
+
+      // Intersections en virage (prise / traversée)
+      const interKeep=[];
+      for(const [id,deg] of nodeDeg){
+        if(deg<3) continue;
+        const g=nodePts.get(id); if(!g) continue;
+        const nr=near(g); if(nr.dist>14) continue;
+        const inCurve=headingChangeAt(nr.meters,26,geo)>=20;
+        if(!inCurve) continue;
+        interKeep.push({ id, lat:g.lat, lon:g.lon, meters:nr.meters });
+      }
+      interKeep.sort((a,b)=>a.meters-b.meters);
+      let lastM=-1e9;
+      for(const it of interKeep){
+        if(it.meters-lastM<25) continue; lastM=it.meters; // dédoublonne les nœuds proches
+        const turn=headingChangeAt(it.meters,32,geo);
+        if(turn>=35) events.turn_curve.push({ lat:it.lat, lon:it.lon, meters:it.meters, detail:'Virée à l\'intersection ('+Math.round(turn)+'°)' });
+        else events.cross_curve.push({ lat:it.lat, lon:it.lon, meters:it.meters, detail:'Traversée ('+Math.round(turn)+'°)' });
+      }
+
+      // Tri par km
+      for(const t of ORDER) (events[t]||[]).sort((a,b)=>a.meters-b.meters);
+
+      // init visibilité par défaut + rendu
+      for(const t of ORDER) enabled[t]=TYPES[t].def && (events[t]||[]).length>0;
+      drawEvents(); applyLayerVisibility(); renderLayerList(); renderTable();
+
+      const total=ORDER.reduce((s,t)=>s+(events[t]||[]).length,0);
+      const warn=failT?` — ⚠️ ${failT} zone(s) non chargée(s) (réseau), résultat incomplet`:'';
+      setStatus(`${total} événement(s) détecté(s) · ${geo.curves.length} virages · ${fmtDist(dist.total)}${warn}.`, failT?'error':'ok');
+    }catch(e){ console.error(e); setStatus('⚠️ '+e.message, 'error'); showBanner(e.message); }
+  }
+
+  function centroid(geom){ let a=0,o=0,n=0; for(const p of geom){ if(p){a+=p.lat;o+=p.lon;n++;} } return n?{lat:a/n,lon:o/n}:null; }
+  // Portion de tracé (res) entre deux km, pour dessiner un span
+  function spanPath(res, rcum, startM, endM){
+    const out=[]; for(let i=0;i<res.length;i++){ if(rcum[i]>=startM-1 && rcum[i]<=endM+1) out.push(res[i]); } return out.length>1?out:[res[0],res[Math.min(1,res.length-1)]];
+  }
+  // Une way OSM longe-t-elle le tracé ? renvoie la portion proche + km de départ
+  function onTrackRun(geom, near, thresh){
+    let start=-1, path=[], best=null;
+    for(let i=0;i<geom.length;i++){
+      const on=near(geom[i]).dist<=thresh;
+      if(on){ if(start<0) start=i; path.push(geom[i]); }
+      else { if(start>=0){ if(segLen(path)>=40){ const s=near(path[0]).meters; if(!best) best={startM:s,path:path.slice()}; } start=-1; path=[]; } }
     }
+    if(start>=0 && segLen(path)>=40){ const s=near(path[0]).meters; if(!best) best={startM:s,path:path.slice()}; }
+    return best;
+  }
+  function segLen(path){ let d=0; for(let i=1;i<path.length;i++) d+=haversine(path[i-1],path[i]); return d; }
+
+  function showBanner(msg){
+    let b=document.getElementById('errBanner');
+    if(!b){ b=document.createElement('div'); b.id='errBanner';
+      b.style.cssText='position:absolute;z-index:600;top:14px;left:50%;transform:translateX(-50%);max-width:80%;background:#3d1f1f;color:#ffb4ab;border:1px solid #a04040;padding:10px 16px;border-radius:10px;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.4);';
+      (document.getElementById('map')||document.body).appendChild(b); }
+    b.textContent='⚠️ '+msg; b.style.display='block';
   }
 
-  // Bannière d'erreur bien visible au centre de la carte
-  function showBanner(msg) {
-    let b = document.getElementById('errBanner');
-    if (!b) {
-      b = document.createElement('div');
-      b.id = 'errBanner';
-      b.style.cssText = 'position:absolute;z-index:600;top:14px;left:50%;transform:translateX(-50%);' +
-        'max-width:80%;background:#3d1f1f;color:#ffb4ab;border:1px solid #a04040;padding:10px 16px;' +
-        'border-radius:10px;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.4);';
-      const mapEl = document.getElementById('map');
-      (mapEl || document.body).appendChild(b);
-    }
-    b.textContent = '⚠️ ' + msg;
-    b.style.display = 'block';
-  }
+  // ============================ Fichier ============================
+  function readFile(file){ if(!file) return; els.fileHint.textContent=file.name;
+    const r=new FileReader(); r.onload=()=>process(r.result); r.onerror=()=>setStatus('Impossible de lire le fichier.','error'); r.readAsText(file); }
+  const fileInput=document.getElementById('fileInput');
+  fileInput.addEventListener('change', e=>readFile(e.target.files[0]));
+  let dragDepth=0;
+  window.addEventListener('dragenter',e=>{e.preventDefault();dragDepth++;document.body.classList.add('dragging');});
+  window.addEventListener('dragover',e=>e.preventDefault());
+  window.addEventListener('dragleave',e=>{e.preventDefault();if(--dragDepth<=0)document.body.classList.remove('dragging');});
+  window.addEventListener('drop',e=>{e.preventDefault();dragDepth=0;document.body.classList.remove('dragging');if(e.dataTransfer.files&&e.dataTransfer.files[0])readFile(e.dataTransfer.files[0]);});
 
-  function readFile(file) {
-    if (!file) return;
-    els.fileHint.textContent = file.name;
-    const reader = new FileReader();
-    reader.onload = () => process(reader.result);
-    reader.onerror = () => setStatus('Impossible de lire le fichier.', 'error');
-    reader.readAsText(file);
-  }
-
-  // ---------- Événements ----------
-  const fileInput = document.getElementById('fileInput');
-  // Le bouton est un <label for="fileInput"> : il ouvre le sélecteur nativement,
-  // sans JavaScript (fonctionne donc même si le reste du script échoue).
-  fileInput.addEventListener('change', e => readFile(e.target.files[0]));
-
-  if (!hasLeaflet) {
-    setStatus('Carte non disponible (Leaflet non chargé — vérifie ta connexion internet). ' +
-              'Le décompte des ronds-points fonctionne quand même.', 'error');
-  }
-
-  // Glisser-déposer
-  let dragDepth = 0;
-  window.addEventListener('dragenter', e => { e.preventDefault(); dragDepth++; document.body.classList.add('dragging'); });
-  window.addEventListener('dragover', e => e.preventDefault());
-  window.addEventListener('dragleave', e => { e.preventDefault(); if (--dragDepth <= 0) document.body.classList.remove('dragging'); });
-  window.addEventListener('drop', e => {
-    e.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging');
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);
-  });
+  if(!hasLeaflet) setStatus('Carte non disponible (Leaflet non chargé). L\'analyse fonctionne quand même.','error');
 })();
 </script>
 </body>
