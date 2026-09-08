@@ -1,46 +1,60 @@
-# IdentMap — Détection d'événements routiers sur trace GPX
+# IdentMap — Détection d'événements routiers (ADAS) sur trace GPX
 
-Application web autonome (un seul fichier `index.html`) qui affiche ta trace
-**GPX/KML** sur une carte interactive et détecte plusieurs **événements routiers**
-le long du parcours. Chaque type est une **couche activable** (case à cocher) et
-apparaît dans un **tableau de synthèse trié par kilomètre**.
+Application web autonome (un seul fichier `index.html`) pour la recherche ADAS
+connectée : tu charges une trace **GPX/KML**, tu **choisis les événements à
+rechercher**, tu lances l'analyse, puis tu **affiches/masques** chaque type sur
+une carte interactive avec un **tableau de synthèse trié par kilomètre**.
 
-## Événements détectés
+## Déroulé
 
-| Événement | Source | Fiabilité |
-|---|---|---|
-| **Nombre de virages** | Géométrie du tracé | ✅ bonne |
-| **Successions de virages** | Géométrie du tracé | ✅ bonne |
-| **Ronds-points / giratoires / mini ronds-points** | OpenStreetMap | ✅ bonne |
-| **Échangeurs** (`highway=motorway_junction`) | OpenStreetMap | ✅ bonne |
-| **Intersection prise en virage** | OSM (intersections) + géométrie | 🟡 heuristique |
-| **Intersection traversée en virage** | OSM + géométrie | 🟡 heuristique |
-| **Route dégradée sans marquage** | OSM (`surface`, `lane_markings=no`) | 🟠 dépend d'OSM |
+1. **Charger un GPX/KML** (bouton ou glisser-déposer).
+2. **Onglet Configuration** : coche les événements à rechercher (par catégorie,
+   avec « tout cocher »). On n'interroge OpenStreetMap que pour ce qui est coché
+   → si tu ne coches que de la géométrie, l'analyse tourne 100 % hors-ligne.
+3. **Lancer l'analyse** (zone par zone, avec progression).
+4. **Onglet Résultats** : cases à cocher pour afficher chaque type sur la carte,
+   compteurs, et tableau (clic = recentrage).
 
-> Les deux dernières s'appuient sur des tags OSM souvent incomplets : elles sont
-> exhaustives seulement là où la carte est bien renseignée.
+## Catalogue d'événements
 
-## Utilisation
+**Géométrie du tracé** (fiable, hors-ligne)
+- Virages (+ sévérité), Épingles à cheveux (angle + rayon serré)
+- Successions de virages, Longues lignes droites
 
-1. Ouvre `index.html` dans un navigateur (ou via un lien hébergé sur mobile).
-2. **Charge un GPX** (bouton ou glisser-déposer). Formats : `.gpx`, `.kml`.
-3. La trace s'affiche, puis l'analyse tourne **zone par zone** (barre de progression).
-4. Coche/décoche les types d'événements pour les afficher sur la carte et dans le tableau.
-5. Clique une ligne du tableau pour recentrer la carte sur l'événement.
+**Altitude / relief** (si la trace contient `<ele>`, détecté automatiquement)
+- Fortes pentes (montée/descente), Virage après sommet de côte, Dénivelé +
+
+**Topologie & régulation** (OpenStreetMap)
+- Ronds-points / giratoires / mini ronds-points, Échangeurs, Bretelles
+- Intersections (toutes) et **intersections en virage** (prise / traversée)
+- Feux tricolores, STOP, Cédez-le-passage, Passages piétons, Passages à niveau,
+  Ralentisseurs, Radars, Péages, Barrières / bornes
+
+**Attributs de la route** (OpenStreetMap)
+- Route dégradée (sans marquage), Route étroite, Tunnels, Ponts
+- Changement de limitation ≈, de nombre de voies ≈, de catégorie ≈
+
+> Fiabilité : la géométrie et les points OSM bien cartographiés sont fiables.
+> Les intersections-en-virage, les routes dégradées et les changements
+> d'attributs (≈) dépendent de la complétude d'OpenStreetMap et sont exhaustifs
+> seulement là où la carte est bien renseignée.
+>
+> Hors périmètre (nécessite les capteurs/logs du véhicule) : vitesse réelle,
+> distance inter-véhiculaire, autres usagers, météo, qualité GNSS, performance
+> réelle des aides à la conduite.
 
 ## Comment ça marche
 
-- **Géométrie** : le tracé est ré-échantillonné à pas constant ; on mesure la
-  rotation cumulée pour isoler les virages, compter, et repérer les successions.
-- **OpenStreetMap** : le parcours est découpé en zones ; une requête
-  [Overpass](https://overpass-api.de/) par zone renvoie les routes et nœuds, dont
-  on tire ronds-points, échangeurs, intersections (nœuds de degré ≥ 3) et
-  revêtements dégradés. Filtrage par proximité au tracé.
-- **Intersections en virage** : intersection OSM + forte courbure locale du tracé ;
-  « prise » si le véhicule tourne, « traversée » sinon.
+- **Géométrie** : tracé ré-échantillonné à pas constant, rotation cumulée par
+  segment pour isoler virages, épingles (angle + rayon), successions, lignes droites.
+- **Altitude** : profil ré-échantillonné (25 m) et lissé, pente sur base 50 m.
+- **OpenStreetMap** : découpage en zones ; une requête [Overpass](https://overpass-api.de/)
+  par zone (uniquement les objets cochés) → routes + nœuds. Intersections =
+  nœuds de degré ≥ 3. Filtrage par proximité au tracé via un index spatial.
+- **Changements d'attributs** : appariement léger des tronçons OSM au tracé.
 
 ## Technique
 
 - [Leaflet](https://leafletjs.com/) **intégré** dans `index.html` (aucun CDN).
 - Fond de carte : tuiles OpenStreetMap. Données : API Overpass (miroirs multiples).
-- Aucune dépendance à installer. Connexion internet requise (carte + Overpass).
+- Aucune dépendance à installer. Connexion internet requise pour les événements OSM.

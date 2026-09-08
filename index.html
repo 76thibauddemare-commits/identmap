@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>IdentMap — Événements routiers sur trace GPX</title>
+<title>IdentMap — Événements routiers ADAS sur trace GPX</title>
 <style id="leaflet-css">
 /* required styles */
 
@@ -669,97 +669,77 @@ svg.leaflet-image-layer.leaflet-interactive path {
 
 </style>
 <style>
-  :root {
-    --bg:#0f1419; --panel:#1a2129; --panel-2:#232c37; --border:#313d4a;
-    --text:#e6edf3; --muted:#9fb0c0; --green:#3fb950;
-  }
-  * { box-sizing: border-box; }
-  html, body { height:100%; margin:0; }
-  body {
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: var(--bg); color: var(--text);
-    display:flex; flex-direction:column; height:100vh; overflow:hidden;
-  }
-  header {
-    padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--border);
-    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
-  }
-  header h1 { font-size:17px; margin:0; font-weight:650; white-space:nowrap; }
-  header h1 .dot { color:#ff6b35; }
-  .file-btn {
-    display:inline-flex; align-items:center; gap:8px; background:#ff6b35; color:#fff;
-    border:none; padding:8px 14px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;
-  }
-  .hint { color:var(--muted); font-size:13px; }
-  input[type=file] { display:none; }
+  :root{--bg:#0f1419;--panel:#1a2129;--panel-2:#232c37;--border:#313d4a;--text:#e6edf3;--muted:#9fb0c0;--accent:#ff6b35;--green:#3fb950;}
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+  header{padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  header h1{font-size:17px;margin:0;font-weight:650;white-space:nowrap;}
+  header h1 .dot{color:var(--accent);}
+  .file-btn{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;}
+  .hint{color:var(--muted);font-size:13px;}
+  input[type=file]{display:none;}
+  .main{flex:1;display:flex;min-height:0;}
+  #map{flex:1;min-width:0;background:#0b0e12;}
+  .sidebar{width:400px;max-width:50vw;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;min-height:0;}
 
-  .main { flex:1; display:flex; min-height:0; }
-  #map { flex:1; min-width:0; background:#0b0e12; }
-  .sidebar {
-    width:390px; max-width:48vw; background:var(--panel); border-left:1px solid var(--border);
-    display:flex; flex-direction:column; min-height:0;
-  }
-  .summary { padding:14px 16px 6px; display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .stat { background:var(--panel-2); border:1px solid var(--border); border-radius:10px; padding:11px 13px; }
-  .stat .value { font-size:24px; font-weight:700; line-height:1.1; }
-  .stat .label { font-size:12px; color:var(--muted); margin-top:3px; }
+  /* Config */
+  #configPanel,#resultsPanel{display:flex;flex-direction:column;min-height:0;flex:1;}
+  #configPanel[hidden],#resultsPanel[hidden]{display:none;}
+  .panel-head{padding:12px 16px 6px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .cfg-scroll{flex:1;overflow-y:auto;padding:0 8px 8px;}
+  .cat{margin:8px 8px 4px;}
+  .cat-head{display:flex;align-items:center;gap:8px;padding:6px 6px;border-radius:7px;font-weight:650;font-size:13px;color:#cbd6e2;}
+  .cat-head input{width:16px;height:16px;accent-color:var(--accent);}
+  .type-row{display:flex;align-items:center;gap:9px;padding:5px 6px 5px 22px;border-radius:7px;cursor:pointer;font-size:13px;}
+  .type-row:hover{background:var(--panel-2);}
+  .type-row input{width:16px;height:16px;accent-color:var(--accent);flex:none;}
+  .type-row.disabled{opacity:.42;}
+  .swatch{width:12px;height:12px;border-radius:3px;flex:none;border:1px solid rgba(255,255,255,.25);}
+  .type-row .nm{flex:1;}
+  .note{font-size:11px;color:var(--muted);}
+  .run-wrap{padding:10px 16px;border-top:1px solid var(--border);}
+  #runBtn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:9px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;}
+  #runBtn:disabled{background:#3a3f47;color:#7c8894;cursor:not-allowed;}
+  .backbtn{background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;padding:10px 16px 0;text-align:left;}
 
-  .layers { padding:8px 16px 12px; border-bottom:1px solid var(--border); }
-  .layers h2 { font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin:8px 0 6px; }
-  .layer-row {
-    display:flex; align-items:center; gap:10px; padding:7px 8px; border-radius:8px; cursor:pointer;
-  }
-  .layer-row:hover { background:var(--panel-2); }
-  .layer-row input { width:17px; height:17px; accent-color:#ff6b35; flex:none; }
-  .swatch { width:14px; height:14px; border-radius:4px; flex:none; border:1px solid rgba(255,255,255,.25); }
-  .layer-row .name { flex:1; font-size:13.5px; }
-  .layer-row .count { font-variant-numeric:tabular-nums; font-weight:700; font-size:14px; }
-  .layer-row.disabled { opacity:.5; }
+  .summary{padding:10px 16px 4px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+  .stat{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:10px;}
+  .stat .value{font-size:20px;font-weight:700;line-height:1.1;}
+  .stat .label{font-size:11px;color:var(--muted);margin-top:3px;}
+  .layers{padding:6px 12px 10px;border-bottom:1px solid var(--border);max-height:34vh;overflow-y:auto;}
+  .layer-row{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:8px;cursor:pointer;}
+  .layer-row:hover{background:var(--panel-2);}
+  .layer-row input{width:16px;height:16px;accent-color:var(--accent);flex:none;}
+  .layer-row .name{flex:1;font-size:13px;}
+  .layer-row .count{font-variant-numeric:tabular-nums;font-weight:700;font-size:13.5px;}
+  .layer-row.disabled{opacity:.45;}
 
-  .table-wrap { flex:1; overflow-y:auto; }
-  table { width:100%; border-collapse:collapse; font-size:13.5px; }
-  thead th {
-    position:sticky; top:0; background:var(--panel); text-align:left; padding:9px 12px;
-    font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted);
-    border-bottom:1px solid var(--border);
-  }
-  tbody tr { border-bottom:1px solid var(--border); cursor:pointer; }
-  tbody tr:hover { background:var(--panel-2); }
-  tbody td { padding:9px 12px; vertical-align:middle; }
-  .km { font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap; }
-  .ev-dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:7px; vertical-align:-1px; }
-  .ev-type { color:var(--muted); font-size:12.5px; }
-
-  .status { padding:11px 16px; font-size:13px; line-height:1.45; color:var(--muted); border-top:1px solid var(--border); min-height:20px; }
-  .status.error { color:#ff7b72; background:#3d1f1f; }
-  .status.ok { color:var(--green); }
-
-  .empty { padding:36px 22px; text-align:center; color:var(--muted); font-size:14px; line-height:1.6; }
-
-  #drop-overlay {
-    position:fixed; inset:0; background:rgba(15,20,25,.85); border:3px dashed #ff6b35;
-    display:none; align-items:center; justify-content:center; z-index:9999; font-size:22px; font-weight:700; color:#ff6b35;
-  }
-  body.dragging #drop-overlay { display:flex; }
-
-  .ev-marker { border:2px solid #fff; border-radius:50%; width:26px; height:26px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; color:#fff; box-shadow:0 1px 4px rgba(0,0,0,.5); }
-  .spinner { display:inline-block; width:14px; height:14px; border:2px solid var(--muted); border-top-color:transparent; border-radius:50%; animation:spin .7s linear infinite; vertical-align:-2px; margin-right:6px; }
-  @keyframes spin { to { transform:rotate(360deg); } }
-
-  @media (max-width:720px) {
-    .main { flex-direction:column; }
-    .sidebar { width:100%; max-width:none; height:52%; border-left:none; border-top:1px solid var(--border); }
-    #map { height:48%; }
-  }
+  .table-wrap{flex:1;overflow-y:auto;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{position:sticky;top:0;background:var(--panel);text-align:left;padding:8px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:1px solid var(--border);}
+  tbody tr{border-bottom:1px solid var(--border);cursor:pointer;}
+  tbody tr:hover{background:var(--panel-2);}
+  tbody td{padding:8px 12px;vertical-align:middle;}
+  .km{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap;}
+  .ev-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:-1px;}
+  .ev-type{color:var(--muted);font-size:12px;}
+  .status{padding:10px 16px;font-size:13px;line-height:1.45;color:var(--muted);border-top:1px solid var(--border);min-height:18px;}
+  .status.error{color:#ff7b72;background:#3d1f1f;}
+  .status.ok{color:var(--green);}
+  .empty{padding:30px 20px;text-align:center;color:var(--muted);font-size:14px;line-height:1.6;}
+  #drop-overlay{position:fixed;inset:0;background:rgba(15,20,25,.85);border:3px dashed var(--accent);display:none;align-items:center;justify-content:center;z-index:9999;font-size:22px;font-weight:700;color:var(--accent);}
+  body.dragging #drop-overlay{display:flex;}
+  .ev-marker{border:2px solid #fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.5);}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--muted);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:6px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  @media (max-width:720px){.main{flex-direction:column;}.sidebar{width:100%;max-width:none;height:56%;border-left:none;border-top:1px solid var(--border);}#map{height:44%;}.summary{grid-template-columns:1fr 1fr 1fr;}}
 </style>
 </head>
 <body>
   <header>
     <h1>Ident<span class="dot">Map</span></h1>
-    <label class="file-btn" for="fileInput">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-      Charger un GPX
-    </label>
+    <label class="file-btn" for="fileInput"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Charger un GPX</label>
     <input type="file" id="fileInput" />
     <span class="hint" id="fileHint">Aucun fichier — glisse ton .gpx / .kml ici</span>
   </header>
@@ -767,25 +747,30 @@ svg.leaflet-image-layer.leaflet-interactive path {
   <div class="main">
     <div id="map"></div>
     <aside class="sidebar">
-      <div class="summary">
-        <div class="stat"><div class="value" id="statDist">—</div><div class="label">Distance totale</div></div>
-        <div class="stat"><div class="value" id="statCurves">—</div><div class="label">Nombre de virages</div></div>
+      <!-- ÉTAPE 1 : configuration -->
+      <div id="configPanel">
+        <div class="panel-head"><span>Événements à rechercher</span><span class="note" id="cfgHint">Charge une trace</span></div>
+        <div class="cfg-scroll" id="cfgList"></div>
+        <div class="run-wrap"><button id="runBtn" disabled>Lancer l'analyse</button></div>
       </div>
-      <div class="layers">
-        <h2>Événements à afficher</h2>
-        <div id="layerList"></div>
-      </div>
-      <div class="table-wrap">
-        <div class="empty" id="emptyState">Charge une trace GPX/KML pour détecter<br>les événements du parcours.</div>
-        <table id="tableBox" style="display:none">
-          <thead><tr><th>Type</th><th>Km</th><th>Détail</th></tr></thead>
-          <tbody id="tableBody"></tbody>
-        </table>
+      <!-- ÉTAPE 2 : résultats -->
+      <div id="resultsPanel" hidden>
+        <button class="backbtn" id="backBtn">◀ Modifier la sélection</button>
+        <div class="summary">
+          <div class="stat"><div class="value" id="statDist">—</div><div class="label">Distance</div></div>
+          <div class="stat"><div class="value" id="statCurves">—</div><div class="label">Virages</div></div>
+          <div class="stat"><div class="value" id="statExtra">—</div><div class="label" id="statExtraLbl">Dénivelé +</div></div>
+        </div>
+        <div class="panel-head"><span>Afficher sur la carte</span></div>
+        <div class="layers"><div id="layerList"></div></div>
+        <div class="table-wrap">
+          <div class="empty" id="emptyState">Aucun événement à afficher.</div>
+          <table id="tableBox" style="display:none"><thead><tr><th>Type</th><th>Km</th><th>Détail</th></tr></thead><tbody id="tableBody"></tbody></table>
+        </div>
       </div>
       <div class="status" id="status"></div>
     </aside>
   </div>
-
   <div id="drop-overlay">Dépose ton fichier GPX / KML</div>
 
 <script id="leaflet-js">
@@ -797,410 +782,383 @@ svg.leaflet-image-layer.leaflet-interactive path {
 //# sourceMappingURL=leaflet.js.map
 </script>
 <script>
-(function () {
+(function(){
   "use strict";
 
-  // ============================ Registre des événements ============================
-  const TYPES = {
-    curve:       { label:'Virages',                            color:'#56d364', kind:'point', def:false },
-    twisty:      { label:'Successions de virages',             color:'#e3b341', kind:'span',  def:true  },
-    roundabout:  { label:'Ronds-points',                       color:'#ff6b35', kind:'point', def:true  },
-    interchange: { label:'Échangeurs',                         color:'#a371f7', kind:'point', def:true  },
-    turn_curve:  { label:'Intersection prise en virage',       color:'#f778ba', kind:'point', def:true  },
-    cross_curve: { label:'Intersection traversée en virage',   color:'#3fb0ff', kind:'point', def:true  },
-    bad_road:    { label:'Route dégradée (sans marquage)',     color:'#8b949e', kind:'span',  def:true  },
+  // ================= Registre =================
+  const CATS=[
+    {id:'geom',label:'Géométrie du tracé'},
+    {id:'ele', label:'Altitude / relief'},
+    {id:'topo',label:'Topologie & régulation (OSM)'},
+    {id:'attr',label:'Attributs de la route (OSM)'},
+  ];
+  const TYPES={
+    curve:      {cat:'geom',label:'Virages',color:'#56d364',kind:'point',def:true},
+    hairpin:    {cat:'geom',label:'Épingles à cheveux',color:'#f85149',kind:'point',def:true},
+    twisty:     {cat:'geom',label:'Successions de virages',color:'#e3b341',kind:'span',def:true},
+    straight:   {cat:'geom',label:'Longues lignes droites',color:'#79c0ff',kind:'span',def:false},
+
+    steep:      {cat:'ele',label:'Fortes pentes',color:'#ffa657',kind:'span',def:true,needsEle:true},
+    crest_curve:{cat:'ele',label:'Virage après sommet de côte',color:'#d2a8ff',kind:'point',def:true,needsEle:true},
+
+    roundabout: {cat:'topo',label:'Ronds-points',color:'#ff6b35',kind:'point',def:true,way:true,mini:true},
+    interchange:{cat:'topo',label:'Échangeurs',color:'#a371f7',kind:'point',def:true,node:{tag:'highway',val:'motorway_junction'},thr:90},
+    ramp:       {cat:'topo',label:'Bretelles (entrée/sortie)',color:'#bc8cff',kind:'span',def:false,way:true},
+    intersection:{cat:'topo',label:'Intersections (toutes)',color:'#6e7681',kind:'point',def:false,way:true,inter:true},
+    turn_curve: {cat:'topo',label:'Intersection prise en virage',color:'#f778ba',kind:'point',def:true,way:true,inter:true},
+    cross_curve:{cat:'topo',label:'Intersection traversée en virage',color:'#3fb0ff',kind:'point',def:true,way:true,inter:true},
+    traffic_signals:{cat:'topo',label:'Feux tricolores',color:'#e34c4c',kind:'point',def:true,node:{tag:'highway',val:'traffic_signals'}},
+    stop:       {cat:'topo',label:'STOP',color:'#ff5c5c',kind:'point',def:true,node:{tag:'highway',val:'stop'}},
+    give_way:   {cat:'topo',label:'Cédez-le-passage',color:'#ffb347',kind:'point',def:true,node:{tag:'highway',val:'give_way'}},
+    crossing:   {cat:'topo',label:'Passages piétons',color:'#58a6ff',kind:'point',def:true,node:{tag:'highway',val:'crossing'}},
+    level_crossing:{cat:'topo',label:'Passages à niveau',color:'#ff5c8a',kind:'point',def:true,node:{tag:'railway',val:'level_crossing'}},
+    traffic_calming:{cat:'topo',label:'Ralentisseurs',color:'#d29922',kind:'point',def:true,node:{tag:'traffic_calming'}},
+    speed_camera:{cat:'topo',label:'Radars',color:'#db61a2',kind:'point',def:true,node:{tag:'highway',val:'speed_camera'}},
+    toll:       {cat:'topo',label:'Péages',color:'#cca700',kind:'point',def:false,node:{tag:'barrier',val:'toll_booth'}},
+    barrier:    {cat:'topo',label:'Barrières / bornes',color:'#8b949e',kind:'point',def:false,node:{tag:'barrier',rx:'^(gate|bollard|lift_gate|swing_gate|block|cattle_grid)$'}},
+
+    bad_road:   {cat:'attr',label:'Route dégradée (sans marquage)',color:'#8b949e',kind:'span',def:true,way:true},
+    narrow:     {cat:'attr',label:'Route étroite',color:'#a5a5a5',kind:'span',def:false,way:true},
+    tunnel:     {cat:'attr',label:'Tunnels',color:'#6e7681',kind:'span',def:true,way:true},
+    bridge:     {cat:'attr',label:'Ponts',color:'#79c0ff',kind:'span',def:false,way:true},
+    speed_limit_change:{cat:'attr',label:'Changement de limitation ≈',color:'#ff7b72',kind:'point',def:true,way:true,attr:'maxspeed'},
+    lanes_change:{cat:'attr',label:'Changement de nb de voies ≈',color:'#f0a020',kind:'point',def:false,way:true,attr:'lanes'},
+    category_change:{cat:'attr',label:'Changement de catégorie ≈',color:'#a371f7',kind:'point',def:false,way:true,attr:'category'},
   };
-  const ORDER = ['roundabout','turn_curve','cross_curve','interchange','twisty','bad_road','curve'];
+  const ORDER=Object.keys(TYPES);
 
-  // ============================ Carte ============================
-  let map=null, trackLayer=null;
-  const layerGroups = {}; // type -> L.layerGroup
-  const enabled = {};     // type -> bool
-  let events = {};        // type -> [event]
-  const hasLeaflet = typeof L !== 'undefined';
-  if (hasLeaflet) {
-    try {
-      map = L.map('map', { zoomControl:true }).setView([46.6,2.5], 6);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'&copy; OpenStreetMap' }).addTo(map);
-      for (const t of ORDER) layerGroups[t] = L.layerGroup();
-    } catch(e){ console.error('Init carte', e); }
-  }
+  // ================= État =================
+  let map=null,trackLayer=null;
+  const layerGroups={},enabled={},selected={};
+  let events={},curPts=null,curDist=null,hasEle=false;
+  const hasLeaflet=typeof L!=='undefined';
+  if(hasLeaflet){ try{
+    map=L.map('map',{zoomControl:true}).setView([46.6,2.5],6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
+    for(const t of ORDER) layerGroups[t]=L.layerGroup();
+  }catch(e){console.error('map',e);} }
 
-  const els = {
-    status:document.getElementById('status'), statDist:document.getElementById('statDist'),
-    statCurves:document.getElementById('statCurves'), tableBody:document.getElementById('tableBody'),
-    tableBox:document.getElementById('tableBox'), emptyState:document.getElementById('emptyState'),
-    fileHint:document.getElementById('fileHint'), layerList:document.getElementById('layerList'),
-  };
-  function setStatus(msg, cls){ els.status.className='status'+(cls?' '+cls:''); els.status.innerHTML=msg||''; }
+  const $=id=>document.getElementById(id);
+  const els={status:$('status'),statDist:$('statDist'),statCurves:$('statCurves'),statExtra:$('statExtra'),statExtraLbl:$('statExtraLbl'),
+    tableBody:$('tableBody'),tableBox:$('tableBox'),emptyState:$('emptyState'),fileHint:$('fileHint'),layerList:$('layerList'),
+    cfgList:$('cfgList'),cfgHint:$('cfgHint'),runBtn:$('runBtn'),configPanel:$('configPanel'),resultsPanel:$('resultsPanel')};
+  function setStatus(m,c){els.status.className='status'+(c?' '+c:'');els.status.innerHTML=m||'';}
 
-  // ============================ Géo ============================
-  const R=6371000, toRad=d=>d*Math.PI/180, toDeg=r=>r*180/Math.PI;
-  function haversine(a,b){
-    const dLat=toRad(b.lat-a.lat), dLon=toRad(b.lon-a.lon), la1=toRad(a.lat), la2=toRad(b.lat);
-    const h=Math.sin(dLat/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;
-    return 2*R*Math.asin(Math.min(1,Math.sqrt(h)));
-  }
-  function bearing(a,b){
-    const la1=toRad(a.lat), la2=toRad(b.lat), dLon=toRad(b.lon-a.lon);
-    const y=Math.sin(dLon)*Math.cos(la2);
-    const x=Math.cos(la1)*Math.sin(la2)-Math.sin(la1)*Math.cos(la2)*Math.cos(dLon);
-    return (toDeg(Math.atan2(y,x))+360)%360;
-  }
-  function angleDiff(a,b){ let d=((b-a+540)%360)-180; return d; } // signé [-180,180]
-  function makeProjector(refLat){ const cos=Math.cos(toRad(refLat)); return p=>({x:toRad(p.lon)*R*cos, y:toRad(p.lat)*R}); }
+  // ================= Géo =================
+  const R=6371000,toRad=d=>d*Math.PI/180,toDeg=r=>r*180/Math.PI;
+  function haversine(a,b){const dLat=toRad(b.lat-a.lat),dLon=toRad(b.lon-a.lon),la1=toRad(a.lat),la2=toRad(b.lat);
+    const h=Math.sin(dLat/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.min(1,Math.sqrt(h)));}
+  function bearing(a,b){const la1=toRad(a.lat),la2=toRad(b.lat),dLon=toRad(b.lon-a.lon);
+    const y=Math.sin(dLon)*Math.cos(la2),x=Math.cos(la1)*Math.sin(la2)-Math.sin(la1)*Math.cos(la2)*Math.cos(dLon);return (toDeg(Math.atan2(y,x))+360)%360;}
+  function angleDiff(a,b){return ((b-a+540)%360)-180;}
 
-  // ============================ Parsing GPX/KML ============================
+  // ================= Parsing GPX/KML (+altitude) =================
   function parseTrack(text){
-    if (/^PK\x03\x04/.test(text)) throw new Error('Fichier KMZ compressé. Dézippe-le et charge le .kml.');
+    if(/^PK\x03\x04/.test(text)) throw new Error('Fichier KMZ compressé. Dézippe-le et charge le .kml.');
     const xml=new DOMParser().parseFromString(text,'application/xml');
-    if (xml.querySelector('parsererror')) throw new Error('Fichier illisible (XML/GPX/KML invalide).');
-    const inB=(lat,lon)=>isFinite(lat)&&isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180;
-    let nodes=Array.from(xml.getElementsByTagName('trkpt'));
-    if(!nodes.length) nodes=Array.from(xml.getElementsByTagName('rtept'));
-    let pts=nodes.map(n=>({lat:parseFloat(n.getAttribute('lat')),lon:parseFloat(n.getAttribute('lon'))})).filter(p=>inB(p.lat,p.lon));
+    if(xml.querySelector('parsererror')) throw new Error('Fichier illisible (XML/GPX/KML invalide).');
+    const inB=(la,lo)=>isFinite(la)&&isFinite(lo)&&Math.abs(la)<=90&&Math.abs(lo)<=180;
+    let src=Array.from(xml.getElementsByTagName('trkpt')); if(!src.length) src=Array.from(xml.getElementsByTagName('rtept'));
+    let pts=src.map(n=>{const el=n.getElementsByTagName('ele')[0];const ele=el?parseFloat(el.textContent):NaN;
+      return {lat:parseFloat(n.getAttribute('lat')),lon:parseFloat(n.getAttribute('lon')),ele};}).filter(p=>inB(p.lat,p.lon));
     if(pts.length<2){
       const kml=[];
-      for(const el of xml.getElementsByTagName('*')){
-        const nm=el.localName||el.nodeName;
-        if(nm==='coordinates'){ el.textContent.trim().split(/\s+/).forEach(t=>{const a=t.split(','),lon=parseFloat(a[0]),lat=parseFloat(a[1]); if(inB(lat,lon)) kml.push({lat,lon});}); }
-        else if(nm==='coord'){ const a=el.textContent.trim().split(/\s+/),lon=parseFloat(a[0]),lat=parseFloat(a[1]); if(inB(lat,lon)) kml.push({lat,lon}); }
+      for(const el of xml.getElementsByTagName('*')){const nm=el.localName||el.nodeName;
+        if(nm==='coordinates'){el.textContent.trim().split(/\s+/).forEach(t=>{const a=t.split(','),lo=parseFloat(a[0]),la=parseFloat(a[1]),el3=parseFloat(a[2]);if(inB(la,lo))kml.push({lat:la,lon:lo,ele:el3});});}
+        else if(nm==='coord'){const a=el.textContent.trim().split(/\s+/),lo=parseFloat(a[0]),la=parseFloat(a[1]),el3=parseFloat(a[2]);if(inB(la,lo))kml.push({lat:la,lon:lo,ele:el3});}
       }
       if(kml.length>=2) pts=kml;
     }
-    if(pts.length<2) throw new Error('Aucun tracé trouvé. Formats acceptés : GPX (.gpx) ou KML (.kml).');
+    if(pts.length<2) throw new Error('Aucun tracé trouvé. Formats : GPX (.gpx) ou KML (.kml).');
     return pts;
   }
-  function buildDistances(pts){
-    const cum=[0], seg=[];
-    for(let i=1;i<pts.length;i++){ const d=haversine(pts[i-1],pts[i]); seg.push(d); cum.push(cum[i-1]+d); }
-    return { cum, seg, total:cum[cum.length-1] };
+  function buildDistances(pts){const cum=[0],seg=[];for(let i=1;i<pts.length;i++){const d=haversine(pts[i-1],pts[i]);seg.push(d);cum.push(cum[i-1]+d);}return {cum,seg,total:cum[cum.length-1]};}
+  function eleRatio(pts){let n=0;for(const p of pts)if(isFinite(p.ele))n++;return n/pts.length;}
+
+  function resample(pts,step){const out=[pts[0]];let acc=0;
+    for(let i=1;i<pts.length;i++){let d=haversine(pts[i-1],pts[i]);if(d===0)continue;let prev=pts[i-1];
+      while(acc+d>=step){const f=(step-acc)/d;const np={lat:prev.lat+(pts[i].lat-prev.lat)*f,lon:prev.lon+(pts[i].lon-prev.lon)*f};out.push(np);prev=np;d=haversine(prev,pts[i]);acc=0;}
+      acc+=d;}
+    out.push(pts[pts.length-1]);return out;}
+
+  // ================= Index spatial du tracé (rapide) =================
+  function buildTrackIndex(res,rcum){
+    const cs=0.0009,grid=new Map(),key=(la,lo)=>Math.round(la/cs)+','+Math.round(lo/cs);
+    for(let i=0;i<res.length;i++){const k=key(res[i].lat,res[i].lon);let a=grid.get(k);if(!a){a=[];grid.set(k,a);}a.push(i);}
+    function query(lat,lon){const ci=Math.round(lat/cs),cj=Math.round(lon/cs);let best={dist:Infinity,meters:0};
+      for(let di=-1;di<=1;di++)for(let dj=-1;dj<=1;dj++){const a=grid.get((ci+di)+','+(cj+dj));if(!a)continue;
+        for(const idx of a){const d=haversine({lat,lon},res[idx]);if(d<best.dist)best={dist:d,meters:rcum[idx]};}}
+      return best;}
+    return {query};
   }
 
-  // Ré-échantillonnage à pas constant (mètres) pour analyse géométrique stable
-  function resample(pts, step){
-    const out=[pts[0]]; let acc=0;
-    for(let i=1;i<pts.length;i++){
-      let d=haversine(pts[i-1],pts[i]);
-      if(d===0) continue;
-      let prev=pts[i-1];
-      while(acc+d>=step){
-        const need=step-acc, f=need/d;
-        const np={ lat:prev.lat+(pts[i].lat-prev.lat)*f, lon:prev.lon+(pts[i].lon-prev.lon)*f };
-        out.push(np); prev=np; d=haversine(prev,pts[i]); acc=0;
-      }
-      acc+=d;
-    }
-    out.push(pts[pts.length-1]);
-    return out;
-  }
-
-  // Projection d'un point sur le tracé -> {dist(m), meters(km cumulés)}
-  function nearestOnTrack(target, projPts, dist, project){
-    const T=project(target); let best={d2:Infinity,meters:0};
-    for(let i=0;i<projPts.length-1;i++){
-      const A=projPts[i], B=projPts[i+1], dx=B.x-A.x, dy=B.y-A.y, len2=dx*dx+dy*dy;
-      let t=len2?((T.x-A.x)*dx+(T.y-A.y)*dy)/len2:0; t=Math.max(0,Math.min(1,t));
-      const px=A.x+t*dx, py=A.y+t*dy, d2=(T.x-px)**2+(T.y-py)**2;
-      if(d2<best.d2) best={d2, meters:dist.cum[i]+t*dist.seg[i]};
-    }
-    return { dist:Math.sqrt(best.d2), meters:best.meters };
-  }
-
-  // ============================ Analyse géométrique (virages) ============================
-  const STEP=12;            // pas de ré-échantillonnage (m)
-  const PER_SEG=3;          // seuil de rotation par pas (deg) pour être "en virage"
-  const STRAIGHT_GAP=36;    // longueur droite (m) qui clôt un virage
-  const MIN_CURVE_DEG=32;   // rotation cumulée mini pour compter un virage
-
+  // ================= Analyse géométrique =================
+  const STEP=12,PER_SEG=3,STRAIGHT_GAP=36,MIN_CURVE_DEG=32;
   function detectCurves(res){
-    const rcum=[0]; for(let i=1;i<res.length;i++) rcum.push(rcum[i-1]+haversine(res[i-1],res[i]));
-    const head=[]; for(let i=0;i<res.length-1;i++) head.push(bearing(res[i],res[i+1]));
-    const curves=[]; let cur=null, straight=0;
-    const close=()=>{ if(cur && cur.sum>=MIN_CURVE_DEG){ const mid=Math.round((cur.i0+cur.i1)/2);
-      curves.push({ startM:rcum[cur.i0], endM:rcum[Math.min(cur.i1+1,res.length-1)], lat:res[mid].lat, lon:res[mid].lon, deg:cur.sum, dir:cur.signed>0?'droite':'gauche' }); } cur=null; };
-    for(let i=1;i<head.length;i++){
-      const d=angleDiff(head[i-1],head[i]), ad=Math.abs(d);
-      if(ad>=PER_SEG){ if(!cur) cur={i0:i,sum:0,signed:0}; cur.sum+=ad; cur.signed+=d; cur.i1=i; straight=0; }
-      else if(cur){ straight+=STEP; if(straight>=STRAIGHT_GAP) close(); }
-    }
-    close();
-    return { curves, rcum, res };
+    const rcum=[0];for(let i=1;i<res.length;i++)rcum.push(rcum[i-1]+haversine(res[i-1],res[i]));
+    const head=[];for(let i=0;i<res.length-1;i++)head.push(bearing(res[i],res[i+1]));
+    const curves=[];let cur=null,straight=0;
+    const close=()=>{if(cur&&cur.sum>=MIN_CURVE_DEG){const mid=Math.round((cur.i0+cur.i1)/2);
+      const startM=rcum[cur.i0],endM=rcum[Math.min(cur.i1+1,res.length-1)];
+      const radius=(endM-startM)/Math.max(0.2,cur.sum*Math.PI/180); // rayon estimé (m)
+      curves.push({startM,endM,lat:res[mid].lat,lon:res[mid].lon,deg:cur.sum,radius,dir:cur.signed>0?'droite':'gauche'});}cur=null;};
+    for(let i=1;i<head.length;i++){const d=angleDiff(head[i-1],head[i]),ad=Math.abs(d);
+      if(ad>=PER_SEG){if(!cur)cur={i0:i,sum:0,signed:0};cur.sum+=ad;cur.signed+=d;cur.i1=i;straight=0;}
+      else if(cur){straight+=STEP;if(straight>=STRAIGHT_GAP)close();}}
+    close();return {curves,rcum,res};
   }
-  function detectTwisty(curves){
-    const GAP=180; const groups=[]; let g=null;
-    for(const c of curves){
-      if(g && c.startM-g.endM<=GAP){ g.endM=c.endM; g.count++; g.curves.push(c); }
-      else { if(g && g.count>=3) groups.push(g); g={startM:c.startM, endM:c.endM, count:1, curves:[c]}; }
-    }
-    if(g && g.count>=3) groups.push(g);
-    return groups.map(g=>{ const m=g.curves[Math.floor(g.curves.length/2)]; return { startM:g.startM, endM:g.endM, count:g.count, lat:m.lat, lon:m.lon }; });
-  }
-  // Rotation du tracé autour d'une position (km) sur une fenêtre ± win (m)
-  function headingChangeAt(meters, win, geo){
-    const {res,rcum}=geo; const at=m=>{ let lo=0,hi=rcum.length-1; while(lo<hi){const mid=(lo+hi)>>1; if(rcum[mid]<m) lo=mid+1; else hi=mid;} return Math.max(0,Math.min(res.length-1,lo)); };
-    const a=at(meters-win), b=at(meters), c=at(meters+win);
-    if(a>=b||b>=c) return 0;
-    return Math.abs(angleDiff(bearing(res[a],res[b]), bearing(res[b],res[c])));
-  }
+  function sev(deg){return deg>=110?'épingle':deg>=75?'serré':deg>=50?'moyen':'léger';}
+  function detectTwisty(curves){const GAP=180;const g0=[];let g=null;
+    for(const c of curves){if(g&&c.startM-g.endM<=GAP){g.endM=c.endM;g.count++;g.curves.push(c);}else{if(g&&g.count>=3)g0.push(g);g={startM:c.startM,endM:c.endM,count:1,curves:[c]};}}
+    if(g&&g.count>=3)g0.push(g);
+    return g0.map(x=>{const m=x.curves[Math.floor(x.curves.length/2)];return {startM:x.startM,endM:x.endM,count:x.count,lat:m.lat,lon:m.lon};});}
+  function detectStraight(curves,totalM,geo){const MIN=900;const out=[];let prevEnd=0;
+    const add=(a,b)=>{if(b-a>=MIN){const mM=(a+b)/2,p=ptAt(mM,geo);out.push({startM:a,endM:b,lat:p.lat,lon:p.lon,len:b-a});}};
+    for(const c of curves){add(prevEnd,c.startM);prevEnd=c.endM;} add(prevEnd,totalM);return out;}
+  function ptAt(m,geo){const {res,rcum}=geo;let lo=0,hi=rcum.length-1;while(lo<hi){const mid=(lo+hi)>>1;if(rcum[mid]<m)lo=mid+1;else hi=mid;}return res[Math.max(0,Math.min(res.length-1,lo))];}
+  function headingChangeAt(m,win,geo){const {res,rcum}=geo;const at=x=>{let lo=0,hi=rcum.length-1;while(lo<hi){const mid=(lo+hi)>>1;if(rcum[mid]<x)lo=mid+1;else hi=mid;}return Math.max(0,Math.min(res.length-1,lo));};
+    const a=at(m-win),b=at(m),c=at(m+win);if(a>=b||b>=c)return 0;return Math.abs(angleDiff(bearing(res[a],res[b]),bearing(res[b],res[c])));}
+  function spanPath(geo,startM,endM){const out=[];for(let i=0;i<geo.res.length;i++){if(geo.rcum[i]>=startM-1&&geo.rcum[i]<=endM+1)out.push(geo.res[i]);}return out.length>1?out:[geo.res[0],geo.res[1]];}
 
-  // ============================ Overpass (zone par zone) ============================
+  // ================= Altitude =================
+  // Profil d'altitude ré-échantillonné à pas constant (25 m) puis lissé -> robuste au bruit
+  const ELE_SP=25;
+  function elevProfile(pts,dist){
+    const P=[];for(let i=0;i<pts.length;i++){if(isFinite(pts[i].ele))P.push({m:dist.cum[i],ele:pts[i].ele,lat:pts[i].lat,lon:pts[i].lon});}
+    if(P.length<2)return [];
+    const prof=[];let j=0;
+    for(let m=0;m<=P[P.length-1].m;m+=ELE_SP){
+      while(j<P.length-1&&P[j+1].m<m)j++;
+      const a=P[j],b=P[Math.min(j+1,P.length-1)],f=b.m>a.m?(m-a.m)/(b.m-a.m):0;
+      prof.push({m,ele:a.ele+(b.ele-a.ele)*f,lat:a.lat+(b.lat-a.lat)*f,lon:a.lon+(b.lon-a.lon)*f});
+    }
+    const W=3; // moyenne glissante ±3 => ~175 m
+    return prof.map((p,i)=>{let s=0,n=0;for(let k=Math.max(0,i-W);k<=Math.min(prof.length-1,i+W);k++){s+=prof[k].ele;n++;}return {m:p.m,ele:s/n,lat:p.lat,lon:p.lon};});
+  }
+  function elevGain(prof){let g=0;for(let i=1;i<prof.length;i++){const d=prof[i].ele-prof[i-1].ele;if(d>0)g+=d;}return g;}
+  function detectSteep(prof){const TH=7,MINLEN=80,BL=2;const out=[];let run=null; // pente sur base 50 m
+    for(let i=BL;i<prof.length;i++){const dl=prof[i].m-prof[i-BL].m;if(dl<=0)continue;const g=(prof[i].ele-prof[i-BL].ele)/dl*100;
+      const up=g>=TH,down=g<=-TH;
+      if(up||down){const dir=up?'montée':'descente';if(!run||run.dir!==dir){if(run&&run.endM-run.startM>=MINLEN)out.push(finalizeSteep(run));run={dir,startM:prof[i-BL].m,endM:prof[i].m,maxg:Math.abs(g),path:[prof[i-BL],prof[i]]};}
+        else{run.endM=prof[i].m;run.maxg=Math.max(run.maxg,Math.abs(g));run.path.push(prof[i]);}}
+      else if(run){if(run.endM-run.startM>=MINLEN)out.push(finalizeSteep(run));run=null;}}
+    if(run&&run.endM-run.startM>=MINLEN)out.push(finalizeSteep(run));return out;}
+  function finalizeSteep(r){const mid=r.path[Math.floor(r.path.length/2)];return {startM:r.startM,endM:r.endM,lat:mid.lat,lon:mid.lon,detail:`${r.dir} ${r.maxg.toFixed(0)}% sur ${fmtDist(r.endM-r.startM)}`,path:r.path.map(p=>({lat:p.lat,lon:p.lon}))};}
+  function detectCrests(prof,curves){const out=[];const W=3; // ±75 m
+    for(let i=W;i<prof.length-W;i++){const before=(prof[i].ele-prof[i-W].ele)/Math.max(1,prof[i].m-prof[i-W].m)*100;
+      const after=(prof[i+W].ele-prof[i].ele)/Math.max(1,prof[i+W].m-prof[i].m)*100;
+      if(before>=2.5&&after<=-2.5){const mc=prof[i].m;const c=curves.find(cv=>cv.startM>=mc-20&&cv.startM<=mc+150);
+        if(c) out.push({lat:c.lat,lon:c.lon,meters:c.startM,detail:'Virage '+Math.round(c.deg)+'° après sommet'});}}
+    out.sort((a,b)=>a.meters-b.meters);const d=[];let last=-1e9;for(const o of out){if(o.meters-last>150){d.push(o);last=o.meters;}}return d;}
+
+  // ================= Overpass =================
   const OVERPASS=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
   let opCursor=0;
-  async function queryOverpass(q, timeoutMs=45000){
-    let lastErr; const order=OVERPASS.map((_,i)=>OVERPASS[(opCursor+i)%OVERPASS.length]); opCursor++;
-    for(const url of order){
-      const ctrl=new AbortController(); const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
-      try{ const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(q),signal:ctrl.signal});
-        clearTimeout(timer); if(!res.ok) throw new Error('HTTP '+res.status); return await res.json();
-      }catch(e){ clearTimeout(timer); lastErr=e; }
-    }
-    throw new Error('OSM injoignable ('+(lastErr&&lastErr.message)+')');
-  }
-  function bboxTiles(pts, tileSize, pad){
-    const tiles=[];
-    for(let i=0;i<pts.length;i+=tileSize){
-      const s=pts.slice(i,Math.min(pts.length,i+tileSize+1));
-      let mnLat=Infinity,mnLon=Infinity,mxLat=-Infinity,mxLon=-Infinity;
-      for(const p of s){ if(p.lat<mnLat)mnLat=p.lat; if(p.lat>mxLat)mxLat=p.lat; if(p.lon<mnLon)mnLon=p.lon; if(p.lon>mxLon)mxLon=p.lon; }
-      tiles.push([mnLat-pad,mnLon-pad,mxLat+pad,mxLon+pad]);
-    }
-    return tiles;
-  }
+  async function queryOverpass(q,timeoutMs=45000){let lastErr;const order=OVERPASS.map((_,i)=>OVERPASS[(opCursor+i)%OVERPASS.length]);opCursor++;
+    for(const url of order){const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+      try{const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(q),signal:ctrl.signal});
+        clearTimeout(timer);if(!res.ok)throw new Error('HTTP '+res.status);return await res.json();}catch(e){clearTimeout(timer);lastErr=e;}}
+    throw new Error('OSM injoignable ('+(lastErr&&lastErr.message)+')');}
+  function bboxTiles(pts,tileSize,pad){const tiles=[];for(let i=0;i<pts.length;i+=tileSize){const s=pts.slice(i,Math.min(pts.length,i+tileSize+1));
+    let a=Infinity,b=Infinity,c=-Infinity,d=-Infinity;for(const p of s){if(p.lat<a)a=p.lat;if(p.lat>c)c=p.lat;if(p.lon<b)b=p.lon;if(p.lon>d)d=p.lon;}tiles.push([a-pad,b-pad,c+pad,d+pad]);}return tiles;}
   const HW='^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|road|track|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link)$';
-  function tileQuery(b){
-    const x=b.map(v=>v.toFixed(6)), box=`(${x[0]},${x[1]},${x[2]},${x[3]})`;
-    return `[out:json][timeout:60];(`+
-      `way["highway"~"${HW}"]${box};`+
-      `node["highway"="motorway_junction"]${box};`+
-      `node["highway"="mini_roundabout"]${box};`+
-    `);out geom;`;
-  }
+  function nodeSelector(nd){return nd.rx?`["${nd.tag}"~"${nd.rx}"]`:(nd.val?`["${nd.tag}"="${nd.val}"]`:`["${nd.tag}"]`);}
+  function nodeTest(nd){return t=>{const v=t[nd.tag];if(v==null)return false;if(nd.rx)return new RegExp(nd.rx).test(v);if(nd.val)return v===nd.val;return true;};}
 
   const BAD_SURF=new Set(['unpaved','gravel','fine_gravel','compacted','dirt','ground','earth','sand','grass','mud','pebblestone','rock']);
+  const CATFAM={motorway:'Autoroute',trunk:'Voie rapide',primary:'Nationale',secondary:'Départementale',tertiary:'Départementale',unclassified:'Route locale',residential:'Rue',living_street:'Zone de rencontre',road:'Route',track:'Chemin'};
+  const stripFam=h=>CATFAM[(h||'').replace(/_link$/,'')]||null;
 
-  // ============================ Rendu ============================
-  function fmtDist(m){ return m>=1000?(m/1000).toFixed(m>=10000?0:1)+' km':Math.round(m)+' m'; }
-  function evMarker(type, text){
-    return L.divIcon({ className:'', html:`<div class="ev-marker" style="background:${TYPES[type].color}">${text||''}</div>`, iconSize:[26,26], iconAnchor:[13,13] });
-  }
-  function clearAll(){
-    for(const t of ORDER){ if(layerGroups[t]) layerGroups[t].clearLayers(); }
-    els.tableBody.innerHTML='';
-  }
+  // ================= Rendu =================
+  function fmtDist(m){return m>=1000?(m/1000).toFixed(m>=10000?0:1)+' km':Math.round(m)+' m';}
+  function evIcon(t,txt){return L.divIcon({className:'',html:`<div class="ev-marker" style="background:${TYPES[t].color}">${txt||''}</div>`,iconSize:[22,22],iconAnchor:[11,11]});}
+  function drawEvents(){if(!map)return;for(const t of ORDER){const lg=layerGroups[t];if(!lg)continue;lg.clearLayers();
+    (events[t]||[]).forEach(ev=>{if(TYPES[t].kind==='span'&&ev.path&&ev.path.length>1)L.polyline(ev.path.map(p=>[p.lat,p.lon]),{color:TYPES[t].color,weight:7,opacity:.8}).addTo(lg);
+      const m=L.marker([ev.lat,ev.lon],{icon:evIcon(t,ev.badge||'')}).addTo(lg);m.bindPopup(`<b>${TYPES[t].label}</b><br>Km ${(ev.meters/1000).toFixed(2)}${ev.detail?'<br>'+ev.detail:''}`);ev._m=m;});}}
+  function applyVis(){if(!map)return;for(const t of ORDER){if(!layerGroups[t])continue;if(enabled[t])layerGroups[t].addTo(map);else map.removeLayer(layerGroups[t]);}}
+  function renderLayerList(){els.layerList.innerHTML='';let any=false;
+    for(const t of ORDER){if(!selected[t])continue;const n=(events[t]||[]).length;any=true;
+      const row=document.createElement('label');row.className='layer-row'+(n===0?' disabled':'');
+      row.innerHTML=`<input type="checkbox" ${enabled[t]&&n>0?'checked':''} ${n===0?'disabled':''}><span class="swatch" style="background:${TYPES[t].color}"></span><span class="name">${TYPES[t].label}</span><span class="count">${n}</span>`;
+      row.querySelector('input').addEventListener('change',e=>{enabled[t]=e.target.checked;applyVis();renderTable();});
+      els.layerList.appendChild(row);}
+    if(!any)els.layerList.innerHTML='<div class="note" style="padding:8px">Aucun type sélectionné.</div>';}
+  function renderTable(){const rows=[];for(const t of ORDER){if(!enabled[t])continue;for(const ev of (events[t]||[]))rows.push({t,ev});}
+    rows.sort((a,b)=>a.ev.meters-b.ev.meters);els.tableBody.innerHTML='';
+    if(!rows.length){els.tableBox.style.display='none';els.emptyState.style.display='block';els.emptyState.innerHTML='Aucun événement à afficher.<br>Coche un type ci-dessus.';return;}
+    els.emptyState.style.display='none';els.tableBox.style.display='table';
+    for(const {t,ev} of rows){const tr=document.createElement('tr');
+      tr.innerHTML=`<td><span class="ev-dot" style="background:${TYPES[t].color}"></span><span class="ev-type">${TYPES[t].label}</span></td><td class="km">${(ev.meters/1000).toFixed(2)}</td><td class="ev-type">${ev.detail||''}</td>`;
+      tr.addEventListener('click',()=>{if(map){map.setView([ev.lat,ev.lon],16,{animate:true});if(ev._m)ev._m.openPopup();}});
+      els.tableBody.appendChild(tr);}}
 
-  function drawEvents(){
-    if(!map) return;
-    for(const t of ORDER){
-      const lg=layerGroups[t]; if(!lg) continue; lg.clearLayers();
-      (events[t]||[]).forEach((ev,idx)=>{
-        if(TYPES[t].kind==='span' && ev.path && ev.path.length>1){
-          L.polyline(ev.path.map(p=>[p.lat,p.lon]), { color:TYPES[t].color, weight:7, opacity:.85 }).addTo(lg);
-        }
-        const m=L.marker([ev.lat,ev.lon], { icon:evMarker(t, ev.badge||'') }).addTo(lg);
-        m.bindPopup(`<b>${TYPES[t].label}</b><br>Km ${(ev.meters/1000).toFixed(2)}${ev.detail?'<br>'+ev.detail:''}`);
-        ev._marker=m;
-      });
+  // ================= Panneau de configuration =================
+  function buildConfig(){els.cfgList.innerHTML='';
+    for(const cat of CATS){const types=ORDER.filter(t=>TYPES[t].cat===cat.id);
+      const wrap=document.createElement('div');wrap.className='cat';
+      const head=document.createElement('label');head.className='cat-head';
+      head.innerHTML=`<input type="checkbox" data-cat="${cat.id}"><span>${cat.label}</span>`;
+      wrap.appendChild(head);
+      for(const t of types){const dis=TYPES[t].needsEle&&!hasEle;
+        const row=document.createElement('label');row.className='type-row'+(dis?' disabled':'');
+        row.innerHTML=`<input type="checkbox" data-type="${t}" ${TYPES[t].def&&!dis?'checked':''} ${dis?'disabled':''}><span class="swatch" style="background:${TYPES[t].color}"></span><span class="nm">${TYPES[t].label}</span>${dis?'<span class="note">altitude requise</span>':''}`;
+        wrap.appendChild(row);}
+      els.cfgList.appendChild(wrap);
+      const catCb=head.querySelector('input');
+      const syncCat=()=>{const cbs=[...wrap.querySelectorAll('input[data-type]:not([disabled])')];const on=cbs.filter(c=>c.checked).length;catCb.checked=on===cbs.length&&cbs.length>0;catCb.indeterminate=on>0&&on<cbs.length;};
+      catCb.addEventListener('change',()=>{wrap.querySelectorAll('input[data-type]:not([disabled])').forEach(c=>c.checked=catCb.checked);updateRunBtn();});
+      wrap.querySelectorAll('input[data-type]').forEach(c=>c.addEventListener('change',()=>{syncCat();updateRunBtn();}));
+      syncCat();
     }
-  }
-  function applyLayerVisibility(){
-    if(!map) return;
-    for(const t of ORDER){
-      if(!layerGroups[t]) continue;
-      if(enabled[t]) layerGroups[t].addTo(map); else map.removeLayer(layerGroups[t]);
-    }
-  }
-  function renderLayerList(){
-    els.layerList.innerHTML='';
-    for(const t of ORDER){
-      const n=(events[t]||[]).length;
-      const row=document.createElement('label');
-      row.className='layer-row'+(n===0?' disabled':'');
-      row.innerHTML=`<input type="checkbox" ${enabled[t]&&n>0?'checked':''} ${n===0?'disabled':''}>`+
-        `<span class="swatch" style="background:${TYPES[t].color}"></span>`+
-        `<span class="name">${TYPES[t].label}</span>`+
-        `<span class="count">${n}</span>`;
-      row.querySelector('input').addEventListener('change', e=>{
-        enabled[t]=e.target.checked; applyLayerVisibility(); renderTable();
-      });
-      els.layerList.appendChild(row);
-    }
-  }
-  function renderTable(){
-    const rows=[];
-    for(const t of ORDER){ if(!enabled[t]) continue; for(const ev of (events[t]||[])) rows.push({t,ev}); }
-    rows.sort((a,b)=>a.ev.meters-b.ev.meters);
-    els.tableBody.innerHTML='';
-    if(rows.length===0){ els.tableBox.style.display='none'; els.emptyState.style.display='block';
-      els.emptyState.innerHTML='Aucun événement à afficher.<br>Coche un type ci-dessus.'; return; }
-    els.emptyState.style.display='none'; els.tableBox.style.display='table';
-    for(const {t,ev} of rows){
-      const tr=document.createElement('tr');
-      tr.innerHTML=`<td><span class="ev-dot" style="background:${TYPES[t].color}"></span><span class="ev-type">${TYPES[t].label}</span></td>`+
-        `<td class="km">${(ev.meters/1000).toFixed(2)}</td>`+
-        `<td class="ev-type">${ev.detail||''}</td>`;
-      tr.addEventListener('click',()=>{ if(map){ map.setView([ev.lat,ev.lon],16,{animate:true}); if(ev._marker) ev._marker.openPopup(); } });
-      els.tableBody.appendChild(tr);
-    }
-  }
+    updateRunBtn();}
+  function selectedTypes(){return [...els.cfgList.querySelectorAll('input[data-type]:checked')].map(c=>c.dataset.type);}
+  function updateRunBtn(){const n=selectedTypes().length;els.runBtn.textContent=curPts?`Lancer l'analyse (${n} type${n>1?'s':''})`:'Charge une trace d\'abord';els.runBtn.disabled=!curPts||n===0;}
 
-  // ============================ Pipeline ============================
-  async function process(text){
+  // ================= Analyse =================
+  async function analyze(){
     try{
-      const banner=document.getElementById('errBanner'); if(banner) banner.style.display='none';
-      setStatus('<span class="spinner"></span>Lecture de la trace…');
-      const pts=parseTrack(text);
-      const dist=buildDistances(pts);
-      els.statDist.textContent=fmtDist(dist.total); els.statCurves.textContent='…';
+      const sel=selectedTypes();const selSet=new Set(sel);
+      for(const t of ORDER) selected[t]=selSet.has(t);
+      els.configPanel.hidden=true;els.resultsPanel.hidden=false;
+      const pts=curPts,dist=curDist;
+      els.statDist.textContent=fmtDist(dist.total);
 
-      if(map){
-        if(trackLayer) map.removeLayer(trackLayer);
-        trackLayer=L.polyline(pts.map(p=>[p.lat,p.lon]),{color:'#ff6b35',weight:3,opacity:.85}).addTo(map);
-        try{ map.fitBounds(trackLayer.getBounds(),{padding:[30,30]}); }catch(e){}
-        setTimeout(()=>{ try{ map.invalidateSize(); }catch(e){} },200);
-      }
-
-      const project=makeProjector(pts[Math.floor(pts.length/2)].lat);
-      const projPts=pts.map(project);
-
-      // --- Géométrie (hors ligne) ---
-      const res=resample(pts, STEP);
-      const geo=detectCurves(res);
+      const geo=detectCurves(resample(pts,STEP));
+      const index=buildTrackIndex(geo.res,geo.rcum);
       els.statCurves.textContent=geo.curves.length;
-      events={ curve:[], twisty:[], roundabout:[], interchange:[], turn_curve:[], cross_curve:[], bad_road:[] };
-      geo.curves.forEach((c,i)=>events.curve.push({ lat:c.lat, lon:c.lon, meters:c.startM, badge:'', detail:`${Math.round(c.deg)}° à ${c.dir}` }));
-      detectTwisty(geo.curves).forEach(g=>{
-        events.twisty.push({ lat:g.lat, lon:g.lon, meters:g.startM, detail:`${g.count} virages sur ${fmtDist(g.endM-g.startM)}`, path:spanPath(res, geo.rcum, g.startM, g.endM) });
-      });
 
-      // --- OSM (zone par zone) ---
-      setStatus(`<span class="spinner"></span>Trace lue : ${pts.length} points, ${fmtDist(dist.total)}. Analyse OpenStreetMap…`);
-      const tiles=bboxTiles(pts, 250, 0.0012);
-      const ways=[]; const wayseen=new Set(); const nodePts=new Map(); const nodeDeg=new Map(); const juncNodes=[]; const miniNodes=[];
-      let okT=0, failT=0;
-      for(let i=0;i<tiles.length;i++){
-        setStatus(`<span class="spinner"></span>Analyse OpenStreetMap… zone ${i+1}/${tiles.length}`);
-        try{
-          const data=await queryOverpass(tileQuery(tiles[i])); okT++;
-          for(const el of (data.elements||[])){
-            if(el.type==='node'){
-              if(el.tags&&el.tags.highway==='motorway_junction') juncNodes.push(el);
-              else if(el.tags&&el.tags.highway==='mini_roundabout') miniNodes.push(el);
-            } else if(el.type==='way' && el.geometry && el.nodes){
-              if(wayseen.has(el.id)) continue; wayseen.add(el.id); // zones chevauchantes
-              ways.push(el);
-              for(let j=0;j<el.nodes.length;j++){
-                const id=el.nodes[j], g=el.geometry[j]; if(!g) continue;
-                nodePts.set(id,g);
-                const inc=(j===0||j===el.nodes.length-1)?1:2;
-                nodeDeg.set(id,(nodeDeg.get(id)||0)+inc);
-              }
+      events={};for(const t of ORDER)events[t]=[];
+
+      // --- Géométrie ---
+      if(selSet.has('curve')) geo.curves.forEach(c=>events.curve.push({lat:c.lat,lon:c.lon,meters:c.startM,detail:`${c.dir}, ${Math.round(c.deg)}° (${sev(c.deg)})`}));
+      if(selSet.has('hairpin')) geo.curves.filter(c=>c.deg>=100&&c.radius<=35).forEach(c=>events.hairpin.push({lat:c.lat,lon:c.lon,meters:c.startM,detail:`${c.dir}, ${Math.round(c.deg)}° · rayon ~${Math.round(c.radius)} m`}));
+      if(selSet.has('twisty')) detectTwisty(geo.curves).forEach(g=>events.twisty.push({lat:g.lat,lon:g.lon,meters:g.startM,detail:`${g.count} virages sur ${fmtDist(g.endM-g.startM)}`,path:spanPath(geo,g.startM,g.endM)}));
+      if(selSet.has('straight')) detectStraight(geo.curves,dist.total,geo).forEach(s=>events.straight.push({lat:s.lat,lon:s.lon,meters:s.startM,detail:`ligne droite ${fmtDist(s.len)}`,path:spanPath(geo,s.startM,s.endM)}));
+
+      // --- Altitude ---
+      els.statExtra.textContent='—';
+      if(hasEle){const prof=elevProfile(pts,dist);els.statExtra.textContent='+'+Math.round(elevGain(prof))+' m';els.statExtraLbl.textContent='Dénivelé +';
+        if(selSet.has('steep')) detectSteep(prof).forEach(s=>events.steep.push({lat:s.lat,lon:s.lon,meters:s.startM,detail:s.detail,path:s.path}));
+        if(selSet.has('crest_curve')) detectCrests(prof,geo.curves).forEach(c=>events.crest_curve.push(c));
+      } else {els.statExtraLbl.textContent='Dénivelé';}
+
+      // --- OSM ---
+      const nodeTypes=sel.filter(t=>TYPES[t].node);
+      const needWays=sel.some(t=>TYPES[t].way);
+      const needInter=sel.some(t=>TYPES[t].inter);
+      const attrWant={maxspeed:selSet.has('speed_limit_change'),lanes:selSet.has('lanes_change'),category:selSet.has('category_change')};
+      const needAttr=attrWant.maxspeed||attrWant.lanes||attrWant.category;
+      const needMini=selSet.has('roundabout');
+
+      if(nodeTypes.length||needWays){
+        setStatus('<span class="spinner"></span>Analyse OpenStreetMap…');
+        const tiles=bboxTiles(pts,250,0.0012);
+        const ways=[],wayseen=new Set(),osmNodes=[],nodeDeg=new Map(),nodePts=new Map();
+        let okT=0,failT=0;
+        // fragments de requête
+        const frags=[];if(needWays)frags.push(`way["highway"~"${HW}"]__B__;`);
+        const nodeSel=new Set();for(const t of nodeTypes)nodeSel.add(nodeSelector(TYPES[t].node));if(needMini)nodeSel.add('["highway"="mini_roundabout"]');
+        for(const s of nodeSel)frags.push(`node${s}__B__;`);
+        for(let i=0;i<tiles.length;i++){
+          setStatus(`<span class="spinner"></span>Analyse OpenStreetMap… zone ${i+1}/${tiles.length}`);
+          const b=tiles[i].map(v=>v.toFixed(6)),box=`(${b[0]},${b[1]},${b[2]},${b[3]})`;
+          const q=`[out:json][timeout:60];(`+frags.map(f=>f.replace('__B__',box)).join('')+`);out geom;`;
+          try{const data=await queryOverpass(q);okT++;
+            for(const el of (data.elements||[])){
+              if(el.type==='node') osmNodes.push(el);
+              else if(el.type==='way'&&el.geometry&&el.nodes){if(wayseen.has(el.id))continue;wayseen.add(el.id);ways.push(el);
+                for(let j=0;j<el.nodes.length;j++){const id=el.nodes[j],g=el.geometry[j];if(!g)continue;nodePts.set(id,g);nodeDeg.set(id,(nodeDeg.get(id)||0)+((j===0||j===el.nodes.length-1)?1:2));}}
             }
-          }
-        }catch(e){ failT++; console.warn('zone',i+1,e.message); }
-      }
-      if(okT===0) throw new Error('Serveur OpenStreetMap injoignable — réessaie dans un instant.');
-
-      const near=t=>nearestOnTrack(t,projPts,dist,project);
-      const seen=new Set();
-
-      // Ronds-points (ways junction + node mini)
-      for(const w of ways){
-        const j=w.tags&&w.tags.junction;
-        if(j==='roundabout'||j==='circular'){
-          const key='w'+w.id; if(seen.has(key))continue; seen.add(key);
-          const c=centroid(w.geometry); const nr=near(c);
-          let on=nr.dist<=40; if(!on&&nr.dist<=150){ for(const g of w.geometry){ if(near(g).dist<=30){on=true;break;} } }
-          if(on) events.roundabout.push({ lat:c.lat, lon:c.lon, meters:nr.meters, detail:j==='circular'?'Giratoire':'Rond-point' });
+          }catch(e){failT++;console.warn('zone',i+1,e.message);}
         }
+        if(okT===0) throw new Error('Serveur OpenStreetMap injoignable — réessaie dans un instant.');
+        const near=g=>index.query(g.lat,g.lon);
+        const seen=new Set();
+
+        // Ronds-points
+        if(selSet.has('roundabout')){
+          for(const w of ways){const j=w.tags&&w.tags.junction;if(j==='roundabout'||j==='circular'){const c=centroid(w.geometry);let nr=near(c);let on=nr.dist<=45;if(!on&&nr.dist<=160){for(const g of w.geometry){const q=near(g);if(q.dist<=32){on=true;nr=q;break;}}}if(on)events.roundabout.push({lat:c.lat,lon:c.lon,meters:nr.meters,detail:j==='circular'?'Giratoire':'Rond-point'});}}
+          for(const nd of osmNodes){if(nd.tags&&nd.tags.highway==='mini_roundabout'){const nr=near(nd);if(nr.dist<=25){const k='n'+nd.id;if(seen.has(k))continue;seen.add(k);events.roundabout.push({lat:nd.lat,lon:nd.lon,meters:nr.meters,detail:'Mini rond-point'});}}}
+        }
+        // Événements ponctuels OSM (noeuds)
+        for(const t of nodeTypes){const test=nodeTest(TYPES[t].node),thr=TYPES[t].thr||24;
+          for(const nd of osmNodes){if(!test(nd.tags||{}))continue;const nr=near(nd);if(nr.dist>thr)continue;const k=t+nd.id;if(seen.has(k))continue;seen.add(k);
+            events[t].push({lat:nd.lat,lon:nd.lon,meters:nr.meters,detail:(nd.tags&&(nd.tags.ref||nd.tags.name))||''});}}
+        // Bretelles / tunnels / ponts / dégradé / étroit (ways span)
+        for(const w of ways){const tg=w.tags||{};
+          const emit=(t,detail)=>{const run=onTrackRun(w.geometry,near,22);if(run){const mid=run.path[Math.floor(run.path.length/2)];events[t].push({lat:mid.lat,lon:mid.lon,meters:run.startM,detail,path:run.path});}};
+          if(selSet.has('ramp')&&/_link$/.test(tg.highway||'')) emit('ramp','Bretelle');
+          if(selSet.has('tunnel')&&tg.tunnel&&tg.tunnel!=='no') emit('tunnel','Tunnel'+(tg.name?' '+tg.name:''));
+          if(selSet.has('bridge')&&tg.bridge&&tg.bridge!=='no') emit('bridge','Pont'+(tg.name?' '+tg.name:''));
+          if(selSet.has('bad_road')&&(tg.lane_markings==='no'||(tg.surface&&BAD_SURF.has(tg.surface))||tg.highway==='track')) emit('bad_road',(tg.lane_markings==='no'?'Sans marquage ':'')+(tg.surface||'dégradée'));
+          if(selSet.has('narrow')&&((tg.width&&parseFloat(tg.width)<=3.2)||(tg.lanes==='1'&&tg.oneway!=='yes'&&/^(unclassified|residential|tertiary|road)$/.test(tg.highway||'')))) emit('narrow','Route étroite'+(tg.width?' '+tg.width+' m':''));
+        }
+        // Intersections (degré>=3) — toutes / en virage
+        if(needInter){const cand=[];for(const [id,deg] of nodeDeg){if(deg<3)continue;const g=nodePts.get(id);if(!g)continue;const nr=near(g);if(nr.dist>14)continue;cand.push({id,lat:g.lat,lon:g.lon,meters:nr.meters});}
+          cand.sort((a,b)=>a.meters-b.meters);let last=-1e9;
+          for(const it of cand){if(it.meters-last<25)continue;last=it.meters;const inCurve=headingChangeAt(it.meters,26,geo)>=20;const turn=headingChangeAt(it.meters,32,geo);
+            if(selSet.has('intersection')) events.intersection.push({lat:it.lat,lon:it.lon,meters:it.meters,detail:'Intersection'+(inCurve?' (en virage)':'')});
+            if(inCurve){if(turn>=35){if(selSet.has('turn_curve'))events.turn_curve.push({lat:it.lat,lon:it.lon,meters:it.meters,detail:'Virée '+Math.round(turn)+'°'});}
+              else{if(selSet.has('cross_curve'))events.cross_curve.push({lat:it.lat,lon:it.lon,meters:it.meters,detail:'Traversée '+Math.round(turn)+'°'});}}}
+        }
+        // Changements d'attributs (map-matching léger)
+        if(needAttr){const ch=attrChanges(ways,index,attrWant);
+          if(attrWant.maxspeed)events.speed_limit_change=ch.maxspeed;
+          if(attrWant.lanes)events.lanes_change=ch.lanes;
+          if(attrWant.category)events.category_change=ch.category;}
+        window.__failT=failT;
       }
-      for(const nd of miniNodes){ const nr=near(nd); if(nr.dist<=25){ const key='n'+nd.id; if(seen.has(key))continue; seen.add(key);
-        events.roundabout.push({ lat:nd.lat, lon:nd.lon, meters:nr.meters, detail:'Mini rond-point' }); } }
 
-      // Échangeurs
-      for(const nd of juncNodes){ const nr=near(nd); if(nr.dist<=90){ const key='j'+nd.id; if(seen.has(key))continue; seen.add(key);
-        const ref=nd.tags&&(nd.tags.ref||nd.tags.name)||''; events.interchange.push({ lat:nd.lat, lon:nd.lon, meters:nr.meters, detail:ref?('Sortie '+ref):'Échangeur' }); } }
-
-      // Routes dégradées sans marquage
-      for(const w of ways){
-        const tg=w.tags||{};
-        const bad = tg.lane_markings==='no' || (tg.surface&&BAD_SURF.has(tg.surface)) || (tg.highway==='track');
-        if(!bad) continue;
-        const run=onTrackRun(w.geometry, near, 22);
-        if(run){ const detail=(tg.lane_markings==='no'?'Sans marquage':'')+(tg.surface?(tg.lane_markings==='no'?' · ':'')+tg.surface:'') || 'Route dégradée';
-          events.bad_road.push({ lat:run.path[Math.floor(run.path.length/2)].lat, lon:run.path[Math.floor(run.path.length/2)].lon, meters:run.startM, detail, path:run.path }); }
-      }
-
-      // Intersections en virage (prise / traversée)
-      const interKeep=[];
-      for(const [id,deg] of nodeDeg){
-        if(deg<3) continue;
-        const g=nodePts.get(id); if(!g) continue;
-        const nr=near(g); if(nr.dist>14) continue;
-        const inCurve=headingChangeAt(nr.meters,26,geo)>=20;
-        if(!inCurve) continue;
-        interKeep.push({ id, lat:g.lat, lon:g.lon, meters:nr.meters });
-      }
-      interKeep.sort((a,b)=>a.meters-b.meters);
-      let lastM=-1e9;
-      for(const it of interKeep){
-        if(it.meters-lastM<25) continue; lastM=it.meters; // dédoublonne les nœuds proches
-        const turn=headingChangeAt(it.meters,32,geo);
-        if(turn>=35) events.turn_curve.push({ lat:it.lat, lon:it.lon, meters:it.meters, detail:'Virée à l\'intersection ('+Math.round(turn)+'°)' });
-        else events.cross_curve.push({ lat:it.lat, lon:it.lon, meters:it.meters, detail:'Traversée ('+Math.round(turn)+'°)' });
-      }
-
-      // Tri par km
-      for(const t of ORDER) (events[t]||[]).sort((a,b)=>a.meters-b.meters);
-
-      // init visibilité par défaut + rendu
-      for(const t of ORDER) enabled[t]=TYPES[t].def && (events[t]||[]).length>0;
-      drawEvents(); applyLayerVisibility(); renderLayerList(); renderTable();
-
-      const total=ORDER.reduce((s,t)=>s+(events[t]||[]).length,0);
-      const warn=failT?` — ⚠️ ${failT} zone(s) non chargée(s) (réseau), résultat incomplet`:'';
-      setStatus(`${total} événement(s) détecté(s) · ${geo.curves.length} virages · ${fmtDist(dist.total)}${warn}.`, failT?'error':'ok');
-    }catch(e){ console.error(e); setStatus('⚠️ '+e.message, 'error'); showBanner(e.message); }
+      for(const t of ORDER)(events[t]||[]).sort((a,b)=>a.meters-b.meters);
+      for(const t of ORDER)enabled[t]=selected[t]&&TYPES[t].def&&(events[t]||[]).length>0;
+      drawEvents();applyVis();renderLayerList();renderTable();
+      const total=ORDER.reduce((s,t)=>s+(selected[t]?(events[t]||[]).length:0),0);
+      const failT=window.__failT||0;const warn=failT?` — ⚠️ ${failT} zone(s) réseau incomplètes`:'';
+      setStatus(`${total} événement(s) · ${geo.curves.length} virages · ${fmtDist(dist.total)}${warn}.`,failT?'error':'ok');
+    }catch(e){console.error(e);setStatus('⚠️ '+e.message,'error');showBanner(e.message);}
   }
 
-  function centroid(geom){ let a=0,o=0,n=0; for(const p of geom){ if(p){a+=p.lat;o+=p.lon;n++;} } return n?{lat:a/n,lon:o/n}:null; }
-  // Portion de tracé (res) entre deux km, pour dessiner un span
-  function spanPath(res, rcum, startM, endM){
-    const out=[]; for(let i=0;i<res.length;i++){ if(rcum[i]>=startM-1 && rcum[i]<=endM+1) out.push(res[i]); } return out.length>1?out:[res[0],res[Math.min(1,res.length-1)]];
-  }
-  // Une way OSM longe-t-elle le tracé ? renvoie la portion proche + km de départ
-  function onTrackRun(geom, near, thresh){
-    let start=-1, path=[], best=null;
-    for(let i=0;i<geom.length;i++){
-      const on=near(geom[i]).dist<=thresh;
-      if(on){ if(start<0) start=i; path.push(geom[i]); }
-      else { if(start>=0){ if(segLen(path)>=40){ const s=near(path[0]).meters; if(!best) best={startM:s,path:path.slice()}; } start=-1; path=[]; } }
-    }
-    if(start>=0 && segLen(path)>=40){ const s=near(path[0]).meters; if(!best) best={startM:s,path:path.slice()}; }
-    return best;
-  }
-  function segLen(path){ let d=0; for(let i=1;i<path.length;i++) d+=haversine(path[i-1],path[i]); return d; }
+  function centroid(g){let a=0,o=0,n=0;for(const p of g){if(p){a+=p.lat;o+=p.lon;n++;}}return n?{lat:a/n,lon:o/n}:null;}
+  function segLen(p){let d=0;for(let i=1;i<p.length;i++)d+=haversine(p[i-1],p[i]);return d;}
+  function onTrackRun(geom,near,thr){let start=-1,path=[],best=null;
+    for(let i=0;i<geom.length;i++){const on=near(geom[i]).dist<=thr;if(on){if(start<0)start=i;path.push(geom[i]);}else{if(start>=0){if(segLen(path)>=40&&!best)best={startM:near(path[0]).meters,path:path.slice()};start=-1;path=[];}}}
+    if(start>=0&&segLen(path)>=40&&!best)best={startM:near(path[0]).meters,path:path.slice()};return best;}
+  function attrChanges(ways,index,want){const BUCKET=40,buckets=new Map();
+    for(const w of ways){const tg=w.tags||{};if(!tg.highway)continue;for(const g of w.geometry){const q=index.query(g.lat,g.lon);if(q.dist>18)continue;const bi=Math.round(q.meters/BUCKET),ex=buckets.get(bi);if(!ex||q.dist<ex.dist)buckets.set(bi,{dist:q.dist,meters:q.meters,tags:tg,lat:g.lat,lon:g.lon});}}
+    const keys=[...buckets.keys()].sort((a,b)=>a-b);const out={maxspeed:[],lanes:[],category:[]};let prev=null;
+    for(const k of keys){const b=buckets.get(k);const tg=b.tags;
+      if(prev){const pt=prev.tags;
+        if(want.maxspeed&&pt.maxspeed!=null&&tg.maxspeed!=null&&pt.maxspeed!==tg.maxspeed)out.maxspeed.push({lat:b.lat,lon:b.lon,meters:b.meters,detail:`${pt.maxspeed} → ${tg.maxspeed} km/h`});
+        if(want.lanes&&pt.lanes!=null&&tg.lanes!=null&&pt.lanes!==tg.lanes)out.lanes.push({lat:b.lat,lon:b.lon,meters:b.meters,detail:`${pt.lanes} → ${tg.lanes} voies`});
+        if(want.category){const a=stripFam(pt.highway),c=stripFam(tg.highway);if(a&&c&&a!==c)out.category.push({lat:b.lat,lon:b.lon,meters:b.meters,detail:`${a} → ${c}`});}}
+      prev=b;}
+    return out;}
 
-  function showBanner(msg){
-    let b=document.getElementById('errBanner');
-    if(!b){ b=document.createElement('div'); b.id='errBanner';
-      b.style.cssText='position:absolute;z-index:600;top:14px;left:50%;transform:translateX(-50%);max-width:80%;background:#3d1f1f;color:#ffb4ab;border:1px solid #a04040;padding:10px 16px;border-radius:10px;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.4);';
-      (document.getElementById('map')||document.body).appendChild(b); }
-    b.textContent='⚠️ '+msg; b.style.display='block';
-  }
+  function showBanner(msg){let b=$('errBanner');if(!b){b=document.createElement('div');b.id='errBanner';
+    b.style.cssText='position:absolute;z-index:600;top:14px;left:50%;transform:translateX(-50%);max-width:80%;background:#3d1f1f;color:#ffb4ab;border:1px solid #a04040;padding:10px 16px;border-radius:10px;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.4);';($('map')||document.body).appendChild(b);}b.textContent='⚠️ '+msg;b.style.display='block';}
 
-  // ============================ Fichier ============================
-  function readFile(file){ if(!file) return; els.fileHint.textContent=file.name;
-    const r=new FileReader(); r.onload=()=>process(r.result); r.onerror=()=>setStatus('Impossible de lire le fichier.','error'); r.readAsText(file); }
-  const fileInput=document.getElementById('fileInput');
-  fileInput.addEventListener('change', e=>readFile(e.target.files[0]));
+  // ================= Fichier / navigation =================
+  function loadPts(text){
+    const b=$('errBanner');if(b)b.style.display='none';
+    const pts=parseTrack(text);const dist=buildDistances(pts);curPts=pts;curDist=dist;hasEle=eleRatio(pts)>=0.5;
+    if(map){if(trackLayer)map.removeLayer(trackLayer);trackLayer=L.polyline(pts.map(p=>[p.lat,p.lon]),{color:'#ff6b35',weight:3,opacity:.85}).addTo(map);
+      try{map.fitBounds(trackLayer.getBounds(),{padding:[30,30]});}catch(e){}setTimeout(()=>{try{map.invalidateSize();}catch(e){}},200);}
+    els.configPanel.hidden=false;els.resultsPanel.hidden=true;
+    els.cfgHint.textContent=`${pts.length} pts · ${fmtDist(dist.total)}${hasEle?' · altitude ✓':''}`;
+    buildConfig();
+    setStatus(`Trace lue : ${pts.length} points, ${fmtDist(dist.total)}${hasEle?', altitude détectée':''}. Choisis les événements puis lance l'analyse.`,'ok');
+  }
+  function readFile(file){if(!file)return;els.fileHint.textContent=file.name;const r=new FileReader();r.onload=()=>{try{loadPts(r.result);}catch(e){setStatus('⚠️ '+e.message,'error');showBanner(e.message);}};r.onerror=()=>setStatus('Impossible de lire le fichier.','error');r.readAsText(file);}
+  $('fileInput').addEventListener('change',e=>readFile(e.target.files[0]));
+  els.runBtn.addEventListener('click',()=>{setStatus('<span class="spinner"></span>Analyse…');setTimeout(analyze,30);});
+  $('backBtn').addEventListener('click',()=>{els.resultsPanel.hidden=true;els.configPanel.hidden=false;});
   let dragDepth=0;
   window.addEventListener('dragenter',e=>{e.preventDefault();dragDepth++;document.body.classList.add('dragging');});
   window.addEventListener('dragover',e=>e.preventDefault());
   window.addEventListener('dragleave',e=>{e.preventDefault();if(--dragDepth<=0)document.body.classList.remove('dragging');});
   window.addEventListener('drop',e=>{e.preventDefault();dragDepth=0;document.body.classList.remove('dragging');if(e.dataTransfer.files&&e.dataTransfer.files[0])readFile(e.dataTransfer.files[0]);});
 
-  if(!hasLeaflet) setStatus('Carte non disponible (Leaflet non chargé). L\'analyse fonctionne quand même.','error');
+  if(!hasLeaflet)setStatus('Carte non disponible (Leaflet non chargé). L\'analyse fonctionne quand même.','error');
 })();
 </script>
 </body>
