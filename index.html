@@ -707,7 +707,11 @@ svg.leaflet-image-layer.leaflet-interactive path {
   .stat{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:10px;}
   .stat .value{font-size:20px;font-weight:700;line-height:1.1;}
   .stat .label{font-size:11px;color:var(--muted);margin-top:3px;}
-  .layers{padding:6px 12px 10px;border-bottom:1px solid var(--border);max-height:34vh;overflow-y:auto;}
+  .envseg{display:flex;gap:6px;padding:0 16px 8px;}
+  .envseg button{flex:1;background:var(--panel-2);color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:8px 6px;font-size:13px;font-weight:600;cursor:pointer;}
+  .envseg button.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .envseg button:disabled{opacity:.4;cursor:not-allowed;}
+  .layers{padding:6px 12px 10px;border-bottom:1px solid var(--border);max-height:30vh;overflow-y:auto;}
   .layer-row{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:8px;cursor:pointer;}
   .layer-row:hover{background:var(--panel-2);}
   .layer-row input{width:16px;height:16px;accent-color:var(--accent);flex:none;}
@@ -760,6 +764,12 @@ svg.leaflet-image-layer.leaflet-interactive path {
           <div class="stat"><div class="value" id="statDist">—</div><div class="label">Distance</div></div>
           <div class="stat"><div class="value" id="statCurves">—</div><div class="label">Virages</div></div>
           <div class="stat"><div class="value" id="statExtra">—</div><div class="label" id="statExtraLbl">Dénivelé +</div></div>
+        </div>
+        <div class="panel-head"><span>Environnement</span><span class="note" id="envNote"></span></div>
+        <div class="envseg" id="envSeg">
+          <button data-env="all" class="on">Tout</button>
+          <button data-env="urban">En ville</button>
+          <button data-env="rural">Hors ville</button>
         </div>
         <div class="panel-head"><span>Afficher sur la carte</span></div>
         <div class="layers"><div id="layerList"></div></div>
@@ -845,6 +855,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   let map=null,trackLayer=null;
   const layerGroups={},enabled={},selected={};
   let events={},curPts=null,curDist=null,hasEle=false;
+  let envFilter='all',hasEnv=false;
   const hasLeaflet=typeof L!=='undefined';
   if(hasLeaflet){ try{
     map=L.map('map',{zoomControl:true}).setView([46.6,2.5],6);
@@ -998,19 +1009,21 @@ svg.leaflet-image-layer.leaflet-interactive path {
 
   // ================= Rendu =================
   function fmtDist(m){return m>=1000?(m/1000).toFixed(m>=10000?0:1)+' km':Math.round(m)+' m';}
+  function matchEnv(ev){return envFilter==='all'?true:envFilter==='urban'?ev.urban===true:ev.urban!==true;}
   function evIcon(t,txt){return L.divIcon({className:'',html:`<div class="ev-marker" style="background:${TYPES[t].color}">${txt||''}</div>`,iconSize:[22,22],iconAnchor:[11,11]});}
   function drawEvents(){if(!map)return;for(const t of ORDER){const lg=layerGroups[t];if(!lg)continue;lg.clearLayers();
-    (events[t]||[]).forEach(ev=>{if(TYPES[t].kind==='span'&&ev.path&&ev.path.length>1)L.polyline(ev.path.map(p=>[p.lat,p.lon]),{color:TYPES[t].color,weight:7,opacity:.8}).addTo(lg);
+    (events[t]||[]).forEach(ev=>{if(!matchEnv(ev))return;if(TYPES[t].kind==='span'&&ev.path&&ev.path.length>1)L.polyline(ev.path.map(p=>[p.lat,p.lon]),{color:TYPES[t].color,weight:7,opacity:.8}).addTo(lg);
       const m=L.marker([ev.lat,ev.lon],{icon:evIcon(t,ev.badge||'')}).addTo(lg);m.bindPopup(`<b>${TYPES[t].label}</b><br>Km ${(ev.meters/1000).toFixed(2)}${ev.detail?'<br>'+ev.detail:''}`);ev._m=m;});}}
   function applyVis(){if(!map)return;for(const t of ORDER){if(!layerGroups[t])continue;if(enabled[t])layerGroups[t].addTo(map);else map.removeLayer(layerGroups[t]);}}
   function renderLayerList(){els.layerList.innerHTML='';let any=false;
-    for(const t of ORDER){if(!selected[t])continue;const n=(events[t]||[]).length;any=true;
+    for(const t of ORDER){if(!selected[t])continue;const n=(events[t]||[]).filter(matchEnv).length;any=true;
       const row=document.createElement('label');row.className='layer-row'+(n===0?' disabled':'');
       row.innerHTML=`<input type="checkbox" ${enabled[t]&&n>0?'checked':''} ${n===0?'disabled':''}><span class="swatch" style="background:${TYPES[t].color}"></span><span class="name">${TYPES[t].label}</span><span class="count">${n}</span>`;
       row.querySelector('input').addEventListener('change',e=>{enabled[t]=e.target.checked;applyVis();renderTable();});
       els.layerList.appendChild(row);}
     if(!any)els.layerList.innerHTML='<div class="note" style="padding:8px">Aucun type sélectionné.</div>';}
-  function renderTable(){const rows=[];for(const t of ORDER){if(!enabled[t])continue;for(const ev of (events[t]||[]))rows.push({t,ev});}
+  function renderEnv(){const seg=$('envSeg');if(!seg)return;[...seg.querySelectorAll('button')].forEach(b=>{b.classList.toggle('on',b.dataset.env===envFilter);if(b.dataset.env!=='all')b.disabled=!hasEnv;});$('envNote').textContent=hasEnv?'':'(coche un type OSM pour l\'activer)';}
+  function renderTable(){const rows=[];for(const t of ORDER){if(!enabled[t])continue;for(const ev of (events[t]||[]))if(matchEnv(ev))rows.push({t,ev});}
     rows.sort((a,b)=>a.ev.meters-b.ev.meters);els.tableBody.innerHTML='';
     if(!rows.length){els.tableBox.style.display='none';els.emptyState.style.display='block';els.emptyState.innerHTML='Aucun événement à afficher.<br>Coche un type ci-dessus.';return;}
     els.emptyState.style.display='none';els.tableBox.style.display='table';
@@ -1046,6 +1059,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     try{
       const sel=selectedTypes();const selSet=new Set(sel);
       for(const t of ORDER) selected[t]=selSet.has(t);
+      envFilter='all';hasEnv=false;
       els.configPanel.hidden=true;els.resultsPanel.hidden=false;
       const pts=curPts,dist=curDist;
       els.statDist.textContent=fmtDist(dist.total);
@@ -1105,6 +1119,8 @@ svg.leaflet-image-layer.leaflet-interactive path {
         if(okT===0) throw new Error('Serveur OpenStreetMap injoignable — réessaie dans un instant.');
         const near=g=>index.query(g.lat,g.lon);
         const seen=new Set();
+        const buckets=ways.length?buildBuckets(ways,index):new Map();
+        const urbanAt=makeUrbanAt(buckets);
 
         // Ronds-points : toujours calculés (sert au dédoublonnage ET de zone d'exclusion)
         const rAll=[];
@@ -1147,7 +1163,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
               else{if(selSet.has('cross_curve'))events.cross_curve.push({lat:it.lat,lon:it.lon,meters:it.meters,detail:'Traversée '+Math.round(turn)+'°'});}}}
         }
         // Changements d'attributs (map-matching léger)
-        if(needAttr){const ch=attrChanges(ways,index,attrWant);
+        if(needAttr){const ch=attrChanges(buckets,attrWant);
           if(attrWant.maxspeed)events.speed_limit_change=ch.maxspeed;
           if(attrWant.lanes)events.lanes_change=ch.lanes;
           if(attrWant.category)events.category_change=ch.category;}
@@ -1155,13 +1171,15 @@ svg.leaflet-image-layer.leaflet-interactive path {
         const EXCL=['curve','hairpin','decreasing_radius','s_curve','crest_curve','intersection','turn_curve','cross_curve'];
         for(const t of EXCL) if(events[t]&&events[t].length) events[t]=events[t].filter(ev=>!inRound(ev.lat,ev.lon));
         els.statCurves.textContent=geo.curves.filter(c=>!inRound(c.lat,c.lon)).length;
+        // Environnement (ville / hors ville) par événement
+        if(ways.length){for(const t of ORDER)for(const ev of (events[t]||[]))ev.urban=urbanAt(ev.meters);hasEnv=true;}
         window.__failT=failT;
       }
 
       for(const t of ORDER)(events[t]||[]).sort((a,b)=>a.meters-b.meters);
       try{window.__events=events;}catch(e){}
       for(const t of ORDER)enabled[t]=selected[t]&&TYPES[t].def&&(events[t]||[]).length>0;
-      drawEvents();applyVis();renderLayerList();renderTable();
+      drawEvents();applyVis();renderLayerList();renderTable();renderEnv();
       const total=ORDER.reduce((s,t)=>s+(selected[t]?(events[t]||[]).length:0),0);
       const failT=window.__failT||0;const warn=failT?` — ⚠️ ${failT} zone(s) réseau incomplètes`:'';
       setStatus(`${total} événement(s) · ${geo.curves.length} virages · ${fmtDist(dist.total)}${warn}.`,failT?'error':'ok');
@@ -1174,8 +1192,18 @@ svg.leaflet-image-layer.leaflet-interactive path {
   function onTrackRun(geom,near,thr){let start=-1,path=[],best=null;
     for(let i=0;i<geom.length;i++){const on=near(geom[i]).dist<=thr;if(on){if(start<0)start=i;path.push(geom[i]);}else{if(start>=0){if(segLen(path)>=40&&!best)best={startM:near(path[0]).meters,path:path.slice()};start=-1;path=[];}}}
     if(start>=0&&segLen(path)>=40&&!best)best={startM:near(path[0]).meters,path:path.slice()};return best;}
-  function attrChanges(ways,index,want){const BUCKET=40,buckets=new Map();
-    for(const w of ways){const tg=w.tags||{};if(!tg.highway)continue;for(const g of w.geometry){const q=index.query(g.lat,g.lon);if(q.dist>18)continue;const bi=Math.round(q.meters/BUCKET),ex=buckets.get(bi);if(!ex||q.dist<ex.dist)buckets.set(bi,{dist:q.dist,meters:q.meters,tags:tg,lat:g.lat,lon:g.lon});}}
+  // Contexte routier échantillonné le long du tracé (voie la plus proche par tranche de 40 m)
+  function buildBuckets(ways,index){const B=40,buckets=new Map();
+    for(const w of ways){const tg=w.tags||{};if(!tg.highway)continue;for(const g of w.geometry){const q=index.query(g.lat,g.lon);if(q.dist>18)continue;const bi=Math.round(q.meters/B),ex=buckets.get(bi);if(!ex||q.dist<ex.dist)buckets.set(bi,{dist:q.dist,meters:q.meters,tags:tg,lat:g.lat,lon:g.lon});}}
+    return buckets;}
+  function isUrbanTags(tg){const ms=parseInt(tg.maxspeed,10);
+    if(/^(residential|living_street|pedestrian|service)$/.test(tg.highway||''))return true;
+    if(isFinite(ms)){if(ms<=50)return true;if(ms>=70)return false;}
+    if(tg.lit==='yes')return true;
+    if(/^(motorway|trunk)$/.test(tg.highway||''))return false;
+    return false;} // par défaut : hors ville
+  function makeUrbanAt(buckets){return m=>{const bi=Math.round(m/40);for(let d=0;d<=4;d++){for(const s of (d===0?[bi]:[bi-d,bi+d])){const b=buckets.get(s);if(b)return isUrbanTags(b.tags);}}return null;};}
+  function attrChanges(buckets,want){
     const keys=[...buckets.keys()].sort((a,b)=>a-b);const out={maxspeed:[],lanes:[],category:[]};let prev=null;
     for(const k of keys){const b=buckets.get(k);const tg=b.tags;
       if(prev){const pt=prev.tags;
@@ -1203,6 +1231,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   $('fileInput').addEventListener('change',e=>readFile(e.target.files[0]));
   els.runBtn.addEventListener('click',()=>{setStatus('<span class="spinner"></span>Analyse…');setTimeout(analyze,30);});
   $('backBtn').addEventListener('click',()=>{els.resultsPanel.hidden=true;els.configPanel.hidden=false;});
+  $('envSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;envFilter=b.dataset.env;renderEnv();drawEvents();applyVis();renderLayerList();renderTable();});
   let dragDepth=0;
   window.addEventListener('dragenter',e=>{e.preventDefault();dragDepth++;document.body.classList.add('dragging');});
   window.addEventListener('dragover',e=>e.preventDefault());

@@ -14,6 +14,8 @@ une carte interactive avec un **tableau de synthèse trié par kilomètre**.
 3. **Lancer l'analyse** (zone par zone, avec progression).
 4. **Onglet Résultats** : cases à cocher pour afficher chaque type sur la carte,
    compteurs, et tableau (clic = recentrage).
+5. **Filtre environnement** : *Tout / En ville / Hors ville* — n'affiche que les
+   événements en agglomération ou hors agglomération (carte + tableau + compteurs).
 
 ## Catalogue d'événements
 
@@ -58,6 +60,10 @@ une carte interactive avec un **tableau de synthèse trié par kilomètre**.
   par zone (uniquement les objets cochés) → routes + nœuds. Intersections =
   nœuds de degré ≥ 3. Filtrage par proximité au tracé via un index spatial.
 - **Changements d'attributs** : appariement léger des tronçons OSM au tracé.
+- **Environnement (ville / hors ville)** : chaque événement est classé d'après le
+  contexte routier OSM à sa position — *en ville* si vitesse ≤ 50, voie
+  résidentielle/zone de rencontre, ou éclairage public ; *hors ville* sinon.
+  Heuristique dépendant de la complétude d'OSM (maxspeed, lit…).
 - **Ronds-points** : dédoublonnés géographiquement (un rond-point cartographié en
   plusieurs tronçons OSM, ou repassé, n'apparaît qu'une fois) ; leur zone est
   exclue des virages, épingles, rayons décroissants, enchaînements en S et
