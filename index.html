@@ -797,9 +797,12 @@ svg.leaflet-image-layer.leaflet-interactive path {
     hairpin:    {cat:'geom',label:'Épingles à cheveux',color:'#f85149',kind:'point',def:true},
     twisty:     {cat:'geom',label:'Successions de virages',color:'#e3b341',kind:'span',def:true},
     straight:   {cat:'geom',label:'Longues lignes droites',color:'#79c0ff',kind:'span',def:false},
+    decreasing_radius:{cat:'geom',label:'Virage à rayon décroissant',color:'#ff5c5c',kind:'point',def:true},
+    s_curve:    {cat:'geom',label:'Enchaînement en S',color:'#a5d6ff',kind:'point',def:false},
 
     steep:      {cat:'ele',label:'Fortes pentes',color:'#ffa657',kind:'span',def:true,needsEle:true},
     crest_curve:{cat:'ele',label:'Virage après sommet de côte',color:'#d2a8ff',kind:'point',def:true,needsEle:true},
+    long_descent:{cat:'ele',label:'Longue descente continue',color:'#58a6ff',kind:'span',def:true,needsEle:true},
 
     roundabout: {cat:'topo',label:'Ronds-points',color:'#ff6b35',kind:'point',def:true,way:true,mini:true},
     interchange:{cat:'topo',label:'Échangeurs',color:'#a371f7',kind:'point',def:true,node:{tag:'highway',val:'motorway_junction'},thr:90},
@@ -812,10 +815,16 @@ svg.leaflet-image-layer.leaflet-interactive path {
     give_way:   {cat:'topo',label:'Cédez-le-passage',color:'#ffb347',kind:'point',def:true,node:{tag:'highway',val:'give_way'}},
     crossing:   {cat:'topo',label:'Passages piétons',color:'#58a6ff',kind:'point',def:true,node:{tag:'highway',val:'crossing'}},
     level_crossing:{cat:'topo',label:'Passages à niveau',color:'#ff5c8a',kind:'point',def:true,node:{tag:'railway',val:'level_crossing'}},
-    traffic_calming:{cat:'topo',label:'Ralentisseurs',color:'#d29922',kind:'point',def:true,node:{tag:'traffic_calming'}},
+    traffic_calming:{cat:'topo',label:'Ralentisseurs',color:'#d29922',kind:'point',def:true,node:{tag:'traffic_calming',rx:'^(bump|hump|table|cushion|rumble_strip|dip)$'}},
     speed_camera:{cat:'topo',label:'Radars',color:'#db61a2',kind:'point',def:true,node:{tag:'highway',val:'speed_camera'}},
     toll:       {cat:'topo',label:'Péages',color:'#cca700',kind:'point',def:false,node:{tag:'barrier',val:'toll_booth'}},
     barrier:    {cat:'topo',label:'Barrières / bornes',color:'#8b949e',kind:'point',def:false,node:{tag:'barrier',rx:'^(gate|bollard|lift_gate|swing_gate|block|cattle_grid)$'}},
+    village:    {cat:'topo',label:'Traversées d\'agglomération',color:'#39d0d8',kind:'point',def:true,node:{tag:'place',rx:'^(city|town|village|hamlet|suburb)$'},thr:170},
+    school:     {cat:'topo',label:'Zones scolaires',color:'#ffd166',kind:'point',def:true,node:{tag:'amenity',val:'school'},thr:80,areaSel:'["amenity"="school"]'},
+    bus_stop:   {cat:'topo',label:'Arrêts de bus',color:'#6ee7b7',kind:'point',def:false,node:{tag:'highway',val:'bus_stop'}},
+    ford:       {cat:'topo',label:'Gués',color:'#4aa8ff',kind:'point',def:true,node:{tag:'ford'}},
+    passing_place:{cat:'topo',label:'Créneaux de dépassement',color:'#c9d1d9',kind:'point',def:false,node:{tag:'highway',val:'passing_place'}},
+    chicane:    {cat:'topo',label:'Chicanes',color:'#ffab70',kind:'point',def:true,node:{tag:'traffic_calming',rx:'^(chicane|choker|island)$'}},
 
     bad_road:   {cat:'attr',label:'Route dégradée (sans marquage)',color:'#8b949e',kind:'span',def:true,way:true},
     narrow:     {cat:'attr',label:'Route étroite',color:'#a5a5a5',kind:'span',def:false,way:true},
@@ -824,6 +833,11 @@ svg.leaflet-image-layer.leaflet-interactive path {
     speed_limit_change:{cat:'attr',label:'Changement de limitation ≈',color:'#ff7b72',kind:'point',def:true,way:true,attr:'maxspeed'},
     lanes_change:{cat:'attr',label:'Changement de nb de voies ≈',color:'#f0a020',kind:'point',def:false,way:true,attr:'lanes'},
     category_change:{cat:'attr',label:'Changement de catégorie ≈',color:'#a371f7',kind:'point',def:false,way:true,attr:'category'},
+    construction:{cat:'attr',label:'Travaux / route en chantier',color:'#e3b341',kind:'span',def:true,way:true},
+    oneway:     {cat:'attr',label:'Sections à sens unique',color:'#8b949e',kind:'span',def:false,way:true},
+    unlit:      {cat:'attr',label:'Non éclairé',color:'#6e7681',kind:'span',def:false,way:true},
+    incline:    {cat:'attr',label:'Pente signalée (OSM)',color:'#ffa657',kind:'span',def:false,way:true},
+    zone30:     {cat:'attr',label:'Zone à basse vitesse (≤30)',color:'#ff9bce',kind:'span',def:false,way:true},
   };
   const ORDER=Object.keys(TYPES);
 
@@ -886,7 +900,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     const cs=0.0009,grid=new Map(),key=(la,lo)=>Math.round(la/cs)+','+Math.round(lo/cs);
     for(let i=0;i<res.length;i++){const k=key(res[i].lat,res[i].lon);let a=grid.get(k);if(!a){a=[];grid.set(k,a);}a.push(i);}
     function query(lat,lon){const ci=Math.round(lat/cs),cj=Math.round(lon/cs);let best={dist:Infinity,meters:0};
-      for(let di=-1;di<=1;di++)for(let dj=-1;dj<=1;dj++){const a=grid.get((ci+di)+','+(cj+dj));if(!a)continue;
+      for(let di=-2;di<=2;di++)for(let dj=-2;dj<=2;dj++){const a=grid.get((ci+di)+','+(cj+dj));if(!a)continue;
         for(const idx of a){const d=haversine({lat,lon},res[idx]);if(d<best.dist)best={dist:d,meters:rcum[idx]};}}
       return best;}
     return {query};
@@ -901,7 +915,11 @@ svg.leaflet-image-layer.leaflet-interactive path {
     const close=()=>{if(cur&&cur.sum>=MIN_CURVE_DEG){const mid=Math.round((cur.i0+cur.i1)/2);
       const startM=rcum[cur.i0],endM=rcum[Math.min(cur.i1+1,res.length-1)];
       const radius=(endM-startM)/Math.max(0.2,cur.sum*Math.PI/180); // rayon estimé (m)
-      curves.push({startM,endM,lat:res[mid].lat,lon:res[mid].lon,deg:cur.sum,radius,dir:cur.signed>0?'droite':'gauche'});}cur=null;};
+      const mi=Math.floor((cur.i0+cur.i1)/2);let s1=0,s2=0;
+      for(let k=cur.i0;k<=cur.i1;k++){const dd=Math.abs(angleDiff(head[k-1],head[k]));if(k<=mi)s1+=dd;else s2+=dd;}
+      const l1=Math.max(1,rcum[mi]-rcum[cur.i0]),l2=Math.max(1,rcum[Math.min(cur.i1+1,res.length-1)]-rcum[mi]);
+      const rIn=l1/Math.max(0.2,s1*Math.PI/180),rOut=l2/Math.max(0.2,s2*Math.PI/180);
+      curves.push({startM,endM,lat:res[mid].lat,lon:res[mid].lon,deg:cur.sum,radius,rIn,rOut,dir:cur.signed>0?'droite':'gauche'});}cur=null;};
     for(let i=1;i<head.length;i++){const d=angleDiff(head[i-1],head[i]),ad=Math.abs(d);
       if(ad>=PER_SEG){if(!cur)cur={i0:i,sum:0,signed:0};cur.sum+=ad;cur.signed+=d;cur.i1=i;straight=0;}
       else if(cur){straight+=STEP;if(straight>=STRAIGHT_GAP)close();}}
@@ -916,6 +934,15 @@ svg.leaflet-image-layer.leaflet-interactive path {
     const add=(a,b)=>{if(b-a>=MIN){const mM=(a+b)/2,p=ptAt(mM,geo);out.push({startM:a,endM:b,lat:p.lat,lon:p.lon,len:b-a});}};
     for(const c of curves){add(prevEnd,c.startM);prevEnd=c.endM;} add(prevEnd,totalM);return out;}
   function ptAt(m,geo){const {res,rcum}=geo;let lo=0,hi=rcum.length-1;while(lo<hi){const mid=(lo+hi)>>1;if(rcum[mid]<m)lo=mid+1;else hi=mid;}return res[Math.max(0,Math.min(res.length-1,lo))];}
+  function decreasingRadius(curves){const out=[];for(const c of curves){if(c.deg>=45&&c.rOut<c.rIn*0.6&&c.rOut<=70)out.push({lat:c.lat,lon:c.lon,meters:c.startM,detail:`rayon ${Math.round(c.rIn)}→${Math.round(c.rOut)} m (${c.dir})`});}return out;}
+  function sCurves(curves){const out=[];for(let i=0;i<curves.length-1;i++){const a=curves[i],b=curves[i+1];if(a.dir!==b.dir&&b.startM-a.endM<=60)out.push({lat:(a.lat+b.lat)/2,lon:(a.lon+b.lon)/2,meters:(a.endM+b.startM)/2,detail:`${a.dir} → ${b.dir}`});}return out;}
+  function longDescent(prof){const BL=2,GTH=-1.5,MINLEN=1500;const out=[];let run=null;
+    for(let i=BL;i<prof.length;i++){const dl=prof[i].m-prof[i-BL].m;if(dl<=0)continue;const g=(prof[i].ele-prof[i-BL].ele)/dl*100;
+      if(g<=GTH){if(!run)run={startM:prof[i-BL].m,endM:prof[i].m,path:[prof[i-BL],prof[i]]};else{run.endM=prof[i].m;run.path.push(prof[i]);}}
+      else if(g>0.8){if(run){if(run.endM-run.startM>=MINLEN)out.push(finLD(run));run=null;}}
+      else if(run){run.endM=prof[i].m;run.path.push(prof[i]);}}
+    if(run&&run.endM-run.startM>=MINLEN)out.push(finLD(run));return out;}
+  function finLD(r){const mid=r.path[Math.floor(r.path.length/2)];const drop=r.path[0].ele-r.path[r.path.length-1].ele;return {lat:mid.lat,lon:mid.lon,meters:r.startM,detail:`descente ${fmtDist(r.endM-r.startM)} (-${Math.round(drop)} m)`,path:r.path.map(p=>({lat:p.lat,lon:p.lon}))};}
   function headingChangeAt(m,win,geo){const {res,rcum}=geo;const at=x=>{let lo=0,hi=rcum.length-1;while(lo<hi){const mid=(lo+hi)>>1;if(rcum[mid]<x)lo=mid+1;else hi=mid;}return Math.max(0,Math.min(res.length-1,lo));};
     const a=at(m-win),b=at(m),c=at(m+win);if(a>=b||b>=c)return 0;return Math.abs(angleDiff(bearing(res[a],res[b]),bearing(res[b],res[c])));}
   function spanPath(geo,startM,endM){const out=[];for(let i=0;i<geo.res.length;i++){if(geo.rcum[i]>=startM-1&&geo.rcum[i]<=endM+1)out.push(geo.res[i]);}return out.length>1?out:[geo.res[0],geo.res[1]];}
@@ -961,7 +988,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     throw new Error('OSM injoignable ('+(lastErr&&lastErr.message)+')');}
   function bboxTiles(pts,tileSize,pad){const tiles=[];for(let i=0;i<pts.length;i+=tileSize){const s=pts.slice(i,Math.min(pts.length,i+tileSize+1));
     let a=Infinity,b=Infinity,c=-Infinity,d=-Infinity;for(const p of s){if(p.lat<a)a=p.lat;if(p.lat>c)c=p.lat;if(p.lon<b)b=p.lon;if(p.lon>d)d=p.lon;}tiles.push([a-pad,b-pad,c+pad,d+pad]);}return tiles;}
-  const HW='^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|road|track|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link)$';
+  const HW='^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|road|track|construction|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link)$';
   function nodeSelector(nd){return nd.rx?`["${nd.tag}"~"${nd.rx}"]`:(nd.val?`["${nd.tag}"="${nd.val}"]`:`["${nd.tag}"]`);}
   function nodeTest(nd){return t=>{const v=t[nd.tag];if(v==null)return false;if(nd.rx)return new RegExp(nd.rx).test(v);if(nd.val)return v===nd.val;return true;};}
 
@@ -1034,12 +1061,15 @@ svg.leaflet-image-layer.leaflet-interactive path {
       if(selSet.has('hairpin')) geo.curves.filter(c=>c.deg>=100&&c.radius<=35).forEach(c=>events.hairpin.push({lat:c.lat,lon:c.lon,meters:c.startM,detail:`${c.dir}, ${Math.round(c.deg)}° · rayon ~${Math.round(c.radius)} m`}));
       if(selSet.has('twisty')) detectTwisty(geo.curves).forEach(g=>events.twisty.push({lat:g.lat,lon:g.lon,meters:g.startM,detail:`${g.count} virages sur ${fmtDist(g.endM-g.startM)}`,path:spanPath(geo,g.startM,g.endM)}));
       if(selSet.has('straight')) detectStraight(geo.curves,dist.total,geo).forEach(s=>events.straight.push({lat:s.lat,lon:s.lon,meters:s.startM,detail:`ligne droite ${fmtDist(s.len)}`,path:spanPath(geo,s.startM,s.endM)}));
+      if(selSet.has('decreasing_radius')) decreasingRadius(geo.curves).forEach(x=>events.decreasing_radius.push(x));
+      if(selSet.has('s_curve')) sCurves(geo.curves).forEach(x=>events.s_curve.push(x));
 
       // --- Altitude ---
       els.statExtra.textContent='—';
       if(hasEle){const prof=elevProfile(pts,dist);els.statExtra.textContent='+'+Math.round(elevGain(prof))+' m';els.statExtraLbl.textContent='Dénivelé +';
         if(selSet.has('steep')) detectSteep(prof).forEach(s=>events.steep.push({lat:s.lat,lon:s.lon,meters:s.startM,detail:s.detail,path:s.path}));
         if(selSet.has('crest_curve')) detectCrests(prof,geo.curves).forEach(c=>events.crest_curve.push(c));
+        if(selSet.has('long_descent')) longDescent(prof).forEach(x=>events.long_descent.push(x));
       } else {els.statExtraLbl.textContent='Dénivelé';}
 
       // --- OSM ---
@@ -1059,6 +1089,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
         const frags=[];if(needWays)frags.push(`way["highway"~"${HW}"]__B__;`);
         const nodeSel=new Set();for(const t of nodeTypes)nodeSel.add(nodeSelector(TYPES[t].node));if(needMini)nodeSel.add('["highway"="mini_roundabout"]');
         for(const s of nodeSel)frags.push(`node${s}__B__;`);
+        for(const t of nodeTypes)if(TYPES[t].areaSel)frags.push(`way${TYPES[t].areaSel}__B__;`); // zones (écoles)
         for(let i=0;i<tiles.length;i++){
           setStatus(`<span class="spinner"></span>Analyse OpenStreetMap… zone ${i+1}/${tiles.length}`);
           const b=tiles[i].map(v=>v.toFixed(6)),box=`(${b[0]},${b[1]},${b[2]},${b[3]})`;
@@ -1067,7 +1098,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
             for(const el of (data.elements||[])){
               if(el.type==='node') osmNodes.push(el);
               else if(el.type==='way'&&el.geometry&&el.nodes){if(wayseen.has(el.id))continue;wayseen.add(el.id);ways.push(el);
-                for(let j=0;j<el.nodes.length;j++){const id=el.nodes[j],g=el.geometry[j];if(!g)continue;nodePts.set(id,g);nodeDeg.set(id,(nodeDeg.get(id)||0)+((j===0||j===el.nodes.length-1)?1:2));}}
+                if(el.tags&&el.tags.highway) for(let j=0;j<el.nodes.length;j++){const id=el.nodes[j],g=el.geometry[j];if(!g)continue;nodePts.set(id,g);nodeDeg.set(id,(nodeDeg.get(id)||0)+((j===0||j===el.nodes.length-1)?1:2));}}
             }
           }catch(e){failT++;console.warn('zone',i+1,e.message);}
         }
@@ -1092,7 +1123,15 @@ svg.leaflet-image-layer.leaflet-interactive path {
           if(selSet.has('bridge')&&tg.bridge&&tg.bridge!=='no') emit('bridge','Pont'+(tg.name?' '+tg.name:''));
           if(selSet.has('bad_road')&&(tg.lane_markings==='no'||(tg.surface&&BAD_SURF.has(tg.surface))||tg.highway==='track')) emit('bad_road',(tg.lane_markings==='no'?'Sans marquage ':'')+(tg.surface||'dégradée'));
           if(selSet.has('narrow')&&((tg.width&&parseFloat(tg.width)<=3.2)||(tg.lanes==='1'&&tg.oneway!=='yes'&&/^(unclassified|residential|tertiary|road)$/.test(tg.highway||'')))) emit('narrow','Route étroite'+(tg.width?' '+tg.width+' m':''));
+          if(selSet.has('construction')&&(tg.highway==='construction'||tg.construction)) emit('construction','Travaux'+(tg.construction?' ('+tg.construction+')':''));
+          if(selSet.has('oneway')&&tg.oneway==='yes'&&tg.highway&&tg.junction!=='roundabout'&&!/_link$/.test(tg.highway)) emit('oneway','Sens unique');
+          if(selSet.has('unlit')&&tg.lit==='no') emit('unlit','Non éclairé');
+          if(selSet.has('incline')&&tg.incline) emit('incline','Incline '+tg.incline);
+          if(selSet.has('zone30')){const ms=parseInt(tg.maxspeed,10);if(isFinite(ms)&&ms<=30) emit('zone30','Limite '+tg.maxspeed+' km/h');}
         }
+        // Zones scolaires (surfaces amenity=school)
+        if(selSet.has('school')){for(const w of ways){if(w.tags&&w.tags.amenity==='school'&&w.geometry){const c=centroid(w.geometry);let best={dist:Infinity,meters:0};for(const g of w.geometry){const q=near(g);if(q.dist<best.dist)best=q;}const cc=near(c);if(cc.dist<best.dist)best=cc;
+          if(best.dist<=(TYPES.school.thr||80)){const k='sa'+w.id;if(seen.has(k))continue;seen.add(k);events.school.push({lat:c.lat,lon:c.lon,meters:best.meters,detail:'École'+(w.tags.name?' '+w.tags.name:'')});}}}}
         // Intersections (degré>=3) — toutes / en virage
         if(needInter){const cand=[];for(const [id,deg] of nodeDeg){if(deg<3)continue;const g=nodePts.get(id);if(!g)continue;const nr=near(g);if(nr.dist>14)continue;cand.push({id,lat:g.lat,lon:g.lon,meters:nr.meters});}
           cand.sort((a,b)=>a.meters-b.meters);let last=-1e9;

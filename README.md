@@ -20,18 +20,24 @@ une carte interactive avec un **tableau de synthèse trié par kilomètre**.
 **Géométrie du tracé** (fiable, hors-ligne)
 - Virages (+ sévérité), Épingles à cheveux (angle + rayon serré)
 - Successions de virages, Longues lignes droites
+- Virages à rayon décroissant, Enchaînements en S
 
 **Altitude / relief** (si la trace contient `<ele>`, détecté automatiquement)
-- Fortes pentes (montée/descente), Virage après sommet de côte, Dénivelé +
+- Fortes pentes (montée/descente), Virage après sommet de côte
+- Longues descentes continues, Dénivelé +
 
 **Topologie & régulation** (OpenStreetMap)
 - Ronds-points / giratoires / mini ronds-points, Échangeurs, Bretelles
 - Intersections (toutes) et **intersections en virage** (prise / traversée)
-- Feux tricolores, STOP, Cédez-le-passage, Passages piétons, Passages à niveau,
-  Ralentisseurs, Radars, Péages, Barrières / bornes
+- Feux tricolores, STOP, Cédez-le-passage, Passages piétons, Passages à niveau
+- Ralentisseurs, Chicanes, Radars, Péages, Barrières / bornes
+- Traversées d'agglomération, Zones scolaires, Arrêts de bus, Gués,
+  Créneaux de dépassement
 
 **Attributs de la route** (OpenStreetMap)
 - Route dégradée (sans marquage), Route étroite, Tunnels, Ponts
+- Travaux / route en chantier, Sections à sens unique, Non éclairé,
+  Pente signalée (OSM), Zone à basse vitesse (≤30)
 - Changement de limitation ≈, de nombre de voies ≈, de catégorie ≈
 
 > Fiabilité : la géométrie et les points OSM bien cartographiés sont fiables.
