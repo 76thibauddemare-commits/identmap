@@ -1,47 +1,46 @@
-# IdentMap — Compteur de ronds-points sur trace GPX
+# IdentMap — Détection d'événements routiers sur trace GPX
 
-Application web autonome (un seul fichier `index.html`) qui :
+Application web autonome (un seul fichier `index.html`) qui affiche ta trace
+**GPX/KML** sur une carte interactive et détecte plusieurs **événements routiers**
+le long du parcours. Chaque type est une **couche activable** (case à cocher) et
+apparaît dans un **tableau de synthèse trié par kilomètre**.
 
-1. affiche ta trace **GPX** sur une carte interactive ;
-2. détecte les **ronds-points** rencontrés le long du parcours grâce aux données **OpenStreetMap** ;
-3. les **marque sur la carte** (pastilles numérotées) ;
-4. affiche dans un volet latéral un **tableau de synthèse** : nombre total de ronds-points et **kilomètre** de chacun le long du tracé.
+## Événements détectés
+
+| Événement | Source | Fiabilité |
+|---|---|---|
+| **Nombre de virages** | Géométrie du tracé | ✅ bonne |
+| **Successions de virages** | Géométrie du tracé | ✅ bonne |
+| **Ronds-points / giratoires / mini ronds-points** | OpenStreetMap | ✅ bonne |
+| **Échangeurs** (`highway=motorway_junction`) | OpenStreetMap | ✅ bonne |
+| **Intersection prise en virage** | OSM (intersections) + géométrie | 🟡 heuristique |
+| **Intersection traversée en virage** | OSM + géométrie | 🟡 heuristique |
+| **Route dégradée sans marquage** | OSM (`surface`, `lane_markings=no`) | 🟠 dépend d'OSM |
+
+> Les deux dernières s'appuient sur des tags OSM souvent incomplets : elles sont
+> exhaustives seulement là où la carte est bien renseignée.
 
 ## Utilisation
 
-1. Ouvre `index.html` dans un navigateur (double-clic, ou héberge le fichier).
-2. Clique sur **Charger un GPX** (ou glisse-dépose ton fichier `.gpx` sur la page).
-3. La trace s'affiche, puis les ronds-points sont recherchés automatiquement.
-4. Clique sur une ligne du tableau pour centrer la carte sur le rond-point correspondant.
-
-> Une connexion internet est nécessaire (fond de carte OpenStreetMap + recherche
-> des ronds-points via l'API Overpass).
+1. Ouvre `index.html` dans un navigateur (ou via un lien hébergé sur mobile).
+2. **Charge un GPX** (bouton ou glisser-déposer). Formats : `.gpx`, `.kml`.
+3. La trace s'affiche, puis l'analyse tourne **zone par zone** (barre de progression).
+4. Coche/décoche les types d'événements pour les afficher sur la carte et dans le tableau.
+5. Clique une ligne du tableau pour recentrer la carte sur l'événement.
 
 ## Comment ça marche
 
-- Le fichier GPX est lu côté navigateur (`trkpt`, sinon `rtept`/`wpt`).
-- La distance cumulée est calculée point par point (formule de haversine).
-- Une version allégée du tracé est envoyée à l'API **Overpass** avec un filtre
-  `around` (25 m) pour ne récupérer que les objets proches du parcours :
-  - `junction=roundabout` → **rond-point**
-  - `junction=circular` → **giratoire**
-  - `highway=mini_roundabout` → **mini rond-point** (pastille bleue)
-- Pour chaque rond-point trouvé, on projette son centre sur le tracé afin de
-  déterminer son **kilomètre** exact. Un filtre de sécurité (> 60 m du tracé)
-  écarte les faux positifs.
-
-## Formats acceptés
-
-- **GPX** (`.gpx`) : balises `trkpt`, `rtept` ou `wpt`.
-- **KML** (`.kml`) : balises `<coordinates>` / `<gx:coord>` (exports Google Maps,
-  Google My Maps…). Pour un **KMZ**, dézippe-le d'abord et charge le `.kml`.
+- **Géométrie** : le tracé est ré-échantillonné à pas constant ; on mesure la
+  rotation cumulée pour isoler les virages, compter, et repérer les successions.
+- **OpenStreetMap** : le parcours est découpé en zones ; une requête
+  [Overpass](https://overpass-api.de/) par zone renvoie les routes et nœuds, dont
+  on tire ronds-points, échangeurs, intersections (nœuds de degré ≥ 3) et
+  revêtements dégradés. Filtrage par proximité au tracé.
+- **Intersections en virage** : intersection OSM + forte courbure locale du tracé ;
+  « prise » si le véhicule tourne, « traversée » sinon.
 
 ## Technique
 
-- [Leaflet](https://leafletjs.com/) **intégré directement** dans `index.html`
-  (aucun CDN à charger) ; fond de carte : tuiles OpenStreetMap.
-- [API Overpass](https://overpass-api.de/) pour les données ronds-points
-  (plusieurs miroirs sont essayés en cas d'indisponibilité).
-- Aucune dépendance à installer, aucun serveur : tout est dans `index.html`.
-- Une connexion internet reste nécessaire pour le fond de carte et la
-  recherche des ronds-points (API Overpass).
+- [Leaflet](https://leafletjs.com/) **intégré** dans `index.html` (aucun CDN).
+- Fond de carte : tuiles OpenStreetMap. Données : API Overpass (miroirs multiples).
+- Aucune dépendance à installer. Connexion internet requise (carte + Overpass).
