@@ -960,7 +960,9 @@ svg.leaflet-image-layer.leaflet-interactive path {
     const xml = new DOMParser().parseFromString(text, 'application/xml');
     if (xml.querySelector('parsererror')) throw new Error('Fichier illisible (XML/GPX/KML invalide).');
 
-    const finite = p => isFinite(p.lat) && isFinite(p.lon);
+    const inBounds = (lat, lon) => isFinite(lat) && isFinite(lon) &&
+      Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+    const finite = p => inBounds(p.lat, p.lon);
 
     // 1) GPX : <trkpt> / <rtept> (attributs lat/lon)
     let nodes = Array.from(xml.getElementsByTagName('trkpt'));
@@ -980,12 +982,12 @@ svg.leaflet-image-layer.leaflet-interactive path {
           el.textContent.trim().split(/\s+/).forEach(t => {
             const a = t.split(',');
             const lon = parseFloat(a[0]), lat = parseFloat(a[1]);
-            if (isFinite(lat) && isFinite(lon)) kml.push({ lat, lon });
+            if (inBounds(lat, lon)) kml.push({ lat, lon });
           });
         } else if (name === 'coord') { // gx:coord
           const a = el.textContent.trim().split(/\s+/);
           const lon = parseFloat(a[0]), lat = parseFloat(a[1]);
-          if (isFinite(lat) && isFinite(lon)) kml.push({ lat, lon });
+          if (inBounds(lat, lon)) kml.push({ lat, lon });
         }
       }
       if (kml.length >= 2) pts = kml;
@@ -1036,12 +1038,13 @@ svg.leaflet-image-layer.leaflet-interactive path {
   }
 
   // Point le plus proche du tracé -> renvoie la distance (m) et le km cumulé
-  function nearestOnTrack(target, pts, dist, project) {
+  // projPts : points du tracé déjà projetés (calculés une seule fois en amont)
+  function nearestOnTrack(target, projPts, dist, project) {
     const T = project(target);
     let best = { d2: Infinity, meters: 0 };
-    for (let i = 0; i < pts.length - 1; i++) {
-      const A = project(pts[i]);
-      const B = project(pts[i+1]);
+    for (let i = 0; i < projPts.length - 1; i++) {
+      const A = projPts[i];
+      const B = projPts[i+1];
       const dx = B.x - A.x, dy = B.y - A.y;
       const len2 = dx*dx + dy*dy;
       let t = len2 ? ((T.x - A.x)*dx + (T.y - A.y)*dy) / len2 : 0;
@@ -1180,6 +1183,7 @@ out geom;`;
 
       const refLat = pts[Math.floor(pts.length/2)].lat;
       const project = makeProjector(refLat);
+      const projPts = pts.map(project); // projeté une seule fois (perf)
 
       const seen = new Set();
       const roundabouts = [];
@@ -1189,7 +1193,7 @@ out geom;`;
         seen.add(key);
         const c = elementCentroid(el);
         if (!c) continue;
-        const near = nearestOnTrack(c, pts, dist, project);
+        const near = nearestOnTrack(c, projPts, dist, project);
         if (near.dist > 60) continue; // sécurité anti faux-positifs
         const tags = el.tags || {};
         const isMini = tags.highway === 'mini_roundabout';
