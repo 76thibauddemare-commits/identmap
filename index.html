@@ -805,8 +805,12 @@ svg.leaflet-image-layer.leaflet-interactive path {
     {id:'attr',label:'Attributs de la route (OSM)'},
   ];
   const TYPES={
-    curve:      {cat:'geom',label:'Virages',color:'#56d364',kind:'point',def:true},
-    hairpin:    {cat:'geom',label:'Épingles à cheveux',color:'#f85149',kind:'point',def:true},
+    curve_50:   {cat:'geom',label:'Virages serrés (R<50 m)',color:'#f85149',kind:'point',def:true},
+    curve_100:  {cat:'geom',label:'Virages (R 50-100 m)',color:'#ff8c42',kind:'point',def:true},
+    curve_300:  {cat:'geom',label:'Virages (R 100-300 m)',color:'#e3b341',kind:'point',def:true},
+    curve_500:  {cat:'geom',label:'Virages (R 300-500 m)',color:'#7ee787',kind:'point',def:true},
+    curve_500p: {cat:'geom',label:'Virages larges (R>500 m)',color:'#58a6ff',kind:'point',def:false},
+    hairpin:    {cat:'geom',label:'Épingles à cheveux',color:'#ff5cf0',kind:'point',def:true},
     twisty:     {cat:'geom',label:'Successions de virages',color:'#e3b341',kind:'span',def:true},
     straight:   {cat:'geom',label:'Longues lignes droites',color:'#79c0ff',kind:'span',def:false},
     decreasing_radius:{cat:'geom',label:'Virage à rayon décroissant',color:'#ff5c5c',kind:'point',def:true},
@@ -852,6 +856,8 @@ svg.leaflet-image-layer.leaflet-interactive path {
     zone30:     {cat:'attr',label:'Zone à basse vitesse (≤30)',color:'#ff9bce',kind:'span',def:false,way:true},
   };
   const ORDER=Object.keys(TYPES);
+  const CURVE_TYPES=['curve_50','curve_100','curve_300','curve_500','curve_500p'];
+  function curveBand(r){return r<50?'curve_50':r<100?'curve_100':r<300?'curve_300':r<500?'curve_500':'curve_500p';}
 
   // ================= État =================
   let map=null,trackLayer=null;
@@ -1073,7 +1079,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
       events={};for(const t of ORDER)events[t]=[];
 
       // --- Géométrie ---
-      if(selSet.has('curve')) geo.curves.forEach(c=>events.curve.push({lat:c.lat,lon:c.lon,meters:c.startM,detail:`${c.dir}, ${Math.round(c.deg)}° (${sev(c.deg)})`}));
+      geo.curves.forEach(c=>{const bt=curveBand(c.radius);if(selSet.has(bt))events[bt].push({lat:c.lat,lon:c.lon,meters:c.startM,detail:`${c.dir}, ${Math.round(c.deg)}° · R ~${Math.round(c.radius)} m`});});
       if(selSet.has('hairpin')) geo.curves.filter(c=>c.deg>=100&&c.radius<=35).forEach(c=>events.hairpin.push({lat:c.lat,lon:c.lon,meters:c.startM,detail:`${c.dir}, ${Math.round(c.deg)}° · rayon ~${Math.round(c.radius)} m`}));
       if(selSet.has('twisty')) detectTwisty(geo.curves).forEach(g=>events.twisty.push({lat:g.lat,lon:g.lon,meters:g.startM,detail:`${g.count} virages sur ${fmtDist(g.endM-g.startM)}`,path:spanPath(geo,g.startM,g.endM)}));
       if(selSet.has('straight')) detectStraight(geo.curves,dist.total,geo).forEach(s=>events.straight.push({lat:s.lat,lon:s.lon,meters:s.startM,detail:`ligne droite ${fmtDist(s.len)}`,path:spanPath(geo,s.startM,s.endM)}));
@@ -1170,7 +1176,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
           if(attrWant.lanes)events.lanes_change=ch.lanes;
           if(attrWant.category)events.category_change=ch.category;}
         // Un rond-point n'est ni un virage ni une intersection : on exclut sa zone
-        const EXCL=['curve','hairpin','decreasing_radius','s_curve','crest_curve','intersection','turn_curve','cross_curve'];
+        const EXCL=[...CURVE_TYPES,'hairpin','decreasing_radius','s_curve','crest_curve','intersection','turn_curve','cross_curve'];
         for(const t of EXCL) if(events[t]&&events[t].length) events[t]=events[t].filter(ev=>!inRound(ev.lat,ev.lon));
         els.statCurves.textContent=geo.curves.filter(c=>!inRound(c.lat,c.lon)).length;
         // Environnement (ville / hors ville) par événement

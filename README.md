@@ -25,7 +25,10 @@ une carte interactive avec un **tableau de synthèse trié par kilomètre**.
 ## Catalogue d'événements
 
 **Géométrie du tracé** (fiable, hors-ligne)
-- Virages (+ sévérité), Épingles à cheveux (angle + rayon serré)
+- Virages par **rayon de courbure estimé** : R<50 m, 50–100 m, 100–300 m,
+  300–500 m, >500 m (chaque bande est une couche séparée ; le rayon est affiché
+  dans le détail). Le « nombre de virages » = somme des bandes.
+- Épingles à cheveux (angle + rayon serré)
 - Successions de virages, Longues lignes droites
 - Virages à rayon décroissant, Enchaînements en S
 
