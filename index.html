@@ -883,7 +883,14 @@ svg.leaflet-image-layer.leaflet-interactive path {
   // ====== Firebase (optionnel : partage des vues entre appareils) ======
   // Colle ta config Web Firebase dans INLINE_FIREBASE_CONFIG (ou via window.IDMAP_FIREBASE_CONFIG).
   // Laisse null => sauvegarde locale uniquement (localStorage).
-  const INLINE_FIREBASE_CONFIG = null;
+  const INLINE_FIREBASE_CONFIG = {
+    apiKey: "AIzaSyBgm_h41sJmrz9_U5QDkY6hV5OKT4kLgYA",
+    authDomain: "identmap.firebaseapp.com",
+    projectId: "identmap",
+    storageBucket: "identmap.firebasestorage.app",
+    messagingSenderId: "1021265877545",
+    appId: "1:1021265877545:web:4f42dfb0ef6988f0105a38"
+  };
   const FIREBASE_CONFIG = (typeof window!=='undefined'&&window.IDMAP_FIREBASE_CONFIG)||INLINE_FIREBASE_CONFIG;
   const CLOUD = !!(FIREBASE_CONFIG&&FIREBASE_CONFIG.projectId);
   let cloudDb=null;
