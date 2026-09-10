@@ -879,6 +879,21 @@ svg.leaflet-image-layer.leaflet-interactive path {
   const layerGroups={},enabled={},selected={};
   let events={},curPts=null,curDist=null,hasEle=false,curName='';
   let envFilter='all',hasEnv=false;
+
+  // ====== Firebase (optionnel : partage des vues entre appareils) ======
+  // Colle ta config Web Firebase dans INLINE_FIREBASE_CONFIG (ou via window.IDMAP_FIREBASE_CONFIG).
+  // Laisse null => sauvegarde locale uniquement (localStorage).
+  const INLINE_FIREBASE_CONFIG = null;
+  const FIREBASE_CONFIG = (typeof window!=='undefined'&&window.IDMAP_FIREBASE_CONFIG)||INLINE_FIREBASE_CONFIG;
+  const CLOUD = !!(FIREBASE_CONFIG&&FIREBASE_CONFIG.projectId);
+  let cloudDb=null;
+  function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('load '+src));document.head.appendChild(s);});}
+  const cloudReady=(async()=>{if(!CLOUD)return null;
+    try{if(typeof firebase==='undefined'){
+      await loadScript('https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js');
+      await loadScript('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js');}
+      firebase.initializeApp(FIREBASE_CONFIG);cloudDb=firebase.firestore();return cloudDb;
+    }catch(e){console.error('Firebase init',e);return null;}})();
   const hasLeaflet=typeof L!=='undefined';
   if(hasLeaflet){ try{
     map=L.map('map',{zoomControl:true}).setView([46.6,2.5],6);
@@ -1314,16 +1329,25 @@ svg.leaflet-image-layer.leaflet-interactive path {
     if(map){try{if(s.mv&&s.mv.c)map.setView(s.mv.c,s.mv.z);else map.fitBounds(trackLayer.getBounds(),{padding:[30,30]});}catch(e){}setTimeout(()=>{try{map.invalidateSize();}catch(e){}},200);}
     setStatus('Vue restaurée (aucun rechargement nécessaire).','ok');
   }
-  function saveView(){
+  async function saveView(){
     if(!curPts){setStatus('Charge et analyse une trace avant d\'enregistrer la vue.','error');return;}
     const id=Math.random().toString(36).slice(2,10);
-    try{localStorage.setItem('idmap_view_'+id,JSON.stringify(serializeState()));}
-    catch(e){setStatus('Impossible d\'enregistrer (stockage indisponible ou plein).','error');return;}
-    const link=location.origin+location.pathname+'#v='+id;
-    try{history.replaceState(null,'','#v='+id);}catch(e){try{location.hash='v='+id;}catch(e2){}}
+    const json=JSON.stringify(serializeState());
+    try{localStorage.setItem('idmap_view_'+id,json);}catch(e){}
+    let link=location.origin+location.pathname+'#v='+id,cloud=false;
+    if(CLOUD){
+      setStatus('<span class="spinner"></span>Enregistrement dans le cloud…');
+      try{const db=await cloudReady;if(!db)throw new Error('cloud indisponible');
+        if(json.length>900000)throw new Error('trace trop volumineuse pour le cloud');
+        await db.collection('views').doc(id).set({data:json,created:Date.now()});
+        link=location.origin+location.pathname+'?id='+id;cloud=true;
+      }catch(e){console.error(e);setStatus('⚠️ Cloud indisponible — lien local généré (cet appareil seulement).','error');}
+    }
+    if(!cloud){try{history.replaceState(null,'','#v='+id);}catch(e){}}
     const box=$('saveBox');box.hidden=false;$('saveLink').value=link;
-    try{navigator.clipboard.writeText(link).then(()=>{},()=>{});setStatus('✅ Vue enregistrée — lien copié (valable sur cet appareil/navigateur).','ok');}
-    catch(e){setStatus('✅ Vue enregistrée — copie le lien ci-dessous.','ok');}
+    try{navigator.clipboard.writeText(link);}catch(e){}
+    if(cloud)setStatus('✅ Vue enregistrée dans le cloud — lien partageable copié (fonctionne sur tout appareil).','ok');
+    else setStatus('✅ Vue enregistrée — lien copié (cet appareil/navigateur).','ok');
   }
   $('saveBtn').addEventListener('click',saveView);
   $('copyLink').addEventListener('click',()=>{const i=$('saveLink');i.select();try{navigator.clipboard.writeText(i.value);}catch(e){}try{document.execCommand('copy');}catch(e){}});
@@ -1341,15 +1365,26 @@ svg.leaflet-image-layer.leaflet-interactive path {
 
   if(!hasLeaflet)setStatus('Carte non disponible (Leaflet non chargé). L\'analyse fonctionne quand même.','error');
 
-  // Restauration d'une vue enregistrée via le lien #v=<id>
-  function tryRestoreFromHash(silent){const m=(location.hash||'').match(/^#v=([A-Za-z0-9]+)/);if(!m)return;
-    try{const raw=localStorage.getItem('idmap_view_'+m[1]);
-      if(!raw){if(!silent)setStatus('Vue introuvable sur cet appareil (les vues sont enregistrées localement dans ce navigateur).','error');return;}
-      restoreState(JSON.parse(raw));
-    }catch(e){console.error(e);if(!silent)setStatus('Vue enregistrée illisible.','error');}
+  // Restauration : lien cloud ?id=<id> (Firestore) ou lien local #v=<id> (localStorage)
+  function restoreLocal(id,silent){try{const raw=localStorage.getItem('idmap_view_'+id);
+    if(!raw){if(!silent)setStatus('Vue introuvable sur cet appareil (vue enregistrée localement dans ce navigateur).','error');return;}
+    restoreState(JSON.parse(raw));}catch(e){console.error(e);if(!silent)setStatus('Vue enregistrée illisible.','error');}}
+  async function tryRestore(){
+    const cid=new URLSearchParams(location.search||'').get('id');
+    if(cid){
+      if(!CLOUD){setStatus('Ce lien nécessite la base cloud, non configurée sur cette version.','error');return;}
+      setStatus('<span class="spinner"></span>Chargement de la vue partagée…');
+      try{const db=await cloudReady;if(!db)throw new Error('cloud');
+        const doc=await db.collection('views').doc(cid).get();
+        if(!doc.exists){setStatus('Vue introuvable (lien expiré ou supprimé).','error');return;}
+        restoreState(JSON.parse(doc.data().data));
+      }catch(e){console.error(e);setStatus('Impossible de charger la vue depuis le cloud.','error');}
+      return;
+    }
+    const m=(location.hash||'').match(/^#v=([A-Za-z0-9]+)/);if(m)restoreLocal(m[1],false);
   }
-  tryRestoreFromHash(false);
-  window.addEventListener('hashchange',()=>tryRestoreFromHash(true));
+  tryRestore();
+  window.addEventListener('hashchange',()=>{const m=(location.hash||'').match(/^#v=([A-Za-z0-9]+)/);if(m)restoreLocal(m[1],true);});
 })();
 </script>
 </body>

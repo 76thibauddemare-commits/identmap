@@ -30,9 +30,39 @@ une carte interactive avec un **tableau de synthèse trié par kilomètre**.
 9. **Enregistrer la vue** : sauvegarde l'analyse (tracé, événements, filtres,
    position de la carte) et génère un lien `#v=<id>`. Rouvrir ce lien réaffiche
    la vue **instantanément**, sans recharger le GPX ni relancer l'analyse.
-   ⚠️ La vue est stockée dans le navigateur (localStorage) : le lien fonctionne
-   sur le **même appareil/navigateur** (pas de serveur, donc pas de partage
-   entre appareils).
+   ⚠️ Par défaut la vue est stockée dans le navigateur (localStorage) : le lien
+   `#v=<id>` fonctionne sur le **même appareil/navigateur**.
+
+## Partage entre appareils (optionnel — Firebase Firestore)
+
+Si une config Firebase est fournie, « Enregistrer la vue » écrit dans **Firestore**
+et génère un lien **`?id=<id>` partageable sur n'importe quel appareil**.
+
+Mise en place (gratuit) :
+1. Crée un projet sur https://console.firebase.google.com (plan **Spark**, gratuit).
+2. **Build → Firestore Database → Créer** (mode production).
+3. **Règles** (onglet Rules) — lecture publique, création limitée, pas de
+   modification/suppression :
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{db}/documents {
+       match /views/{id} {
+         allow read: if true;
+         allow create: if request.resource.data.data is string
+                       && request.resource.data.data.size() < 1000000;
+         allow update, delete: if false;
+       }
+     }
+   }
+   ```
+4. **Paramètres du projet → Tes applications → Web** : copie l'objet de config
+   (`apiKey`, `authDomain`, `projectId`, …) et colle-le dans `INLINE_FIREBASE_CONFIG`
+   au début du `<script>` de l'app (la clé Web Firebase est publique par design ;
+   la sécurité vient des règles ci-dessus).
+
+Sans config, l'app reste 100 % locale (aucune dépendance externe autre que la
+carte et Overpass).
 
 ## Catalogue d'événements
 
