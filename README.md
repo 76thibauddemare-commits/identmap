@@ -27,6 +27,12 @@ une carte interactive avec un **tableau de synthèse trié par kilomètre**.
 8. **Topic « Virages (tous) »** : une case maître dans les résultats affiche ou
    masque d'un coup toutes les familles de virages (bandes de rayon, épingles,
    rayon décroissant, enchaînements en S).
+9. **Enregistrer la vue** : sauvegarde l'analyse (tracé, événements, filtres,
+   position de la carte) et génère un lien `#v=<id>`. Rouvrir ce lien réaffiche
+   la vue **instantanément**, sans recharger le GPX ni relancer l'analyse.
+   ⚠️ La vue est stockée dans le navigateur (localStorage) : le lien fonctionne
+   sur le **même appareil/navigateur** (pas de serveur, donc pas de partage
+   entre appareils).
 
 ## Catalogue d'événements
 

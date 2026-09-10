@@ -706,7 +706,12 @@ svg.leaflet-image-layer.leaflet-interactive path {
   .run-wrap{padding:10px 16px;border-top:1px solid var(--border);}
   #runBtn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:9px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;}
   #runBtn:disabled{background:#3a3f47;color:#7c8894;cursor:not-allowed;}
-  .backbtn{background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;padding:10px 16px 0;text-align:left;}
+  .results-top{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 0;gap:8px;}
+  .backbtn{background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;padding:0;text-align:left;}
+  .savebtn{background:var(--panel-2);border:1px solid var(--border);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;padding:7px 11px;border-radius:8px;white-space:nowrap;}
+  #saveBox{display:flex;gap:6px;padding:8px 16px 0;}
+  #saveBox input{flex:1;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:7px 9px;font-size:12px;}
+  #saveBox button{background:var(--accent);color:#fff;border:none;border-radius:7px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer;}
 
   .summary{padding:10px 16px 4px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
   .stat{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:10px;}
@@ -766,7 +771,11 @@ svg.leaflet-image-layer.leaflet-interactive path {
       </div>
       <!-- ÉTAPE 2 : résultats -->
       <div id="resultsPanel" hidden>
-        <button class="backbtn" id="backBtn">◀ Modifier la sélection</button>
+        <div class="results-top">
+          <button class="backbtn" id="backBtn">◀ Modifier la sélection</button>
+          <button class="savebtn" id="saveBtn">💾 Enregistrer la vue</button>
+        </div>
+        <div id="saveBox" hidden><input id="saveLink" readonly><button id="copyLink">Copier</button></div>
         <div class="summary">
           <div class="stat"><div class="value" id="statDist">—</div><div class="label">Distance</div></div>
           <div class="stat"><div class="value" id="statCurves">—</div><div class="label">Virages</div></div>
@@ -1283,6 +1292,42 @@ svg.leaflet-image-layer.leaflet-interactive path {
     setStatus('✅ KML téléchargé. Dans Google My Maps (ouvert dans l\'onglet) : « Créer une carte » → « Importer » → choisis le fichier .kml → le tracé fidèle et les événements s\'affichent.','ok');
   });
 
+  // ===== Enregistrer / restaurer une vue (localStorage + lien #v=id) =====
+  function serializeState(){
+    const clean={};
+    for(const t of ORDER){clean[t]=(events[t]||[]).map(ev=>{const o={lat:ev.lat,lon:ev.lon,meters:ev.meters};if(ev.detail)o.detail=ev.detail;if(ev.badge)o.badge=ev.badge;if(ev.path)o.path=ev.path;if('urban'in ev)o.urban=ev.urban;return o;});}
+    const mv=map?{c:[map.getCenter().lat,map.getCenter().lng],z:map.getZoom()}:null;
+    return {v:1,name:curName,hasEle,pts:curPts,events:clean,enabled:{...enabled},selected:{...selected},envFilter,hasEnv,
+      stat:{dist:els.statDist.textContent,curves:els.statCurves.textContent,extra:els.statExtra.textContent,extraLbl:els.statExtraLbl.textContent},mv};
+  }
+  function restoreState(s){
+    curName=s.name||'';curPts=s.pts;hasEle=!!s.hasEle;curDist=buildDistances(curPts);
+    events={};for(const t of ORDER)events[t]=(s.events&&s.events[t])?s.events[t]:[];
+    for(const t of ORDER){selected[t]=!!(s.selected&&s.selected[t]);enabled[t]=!!(s.enabled&&s.enabled[t]);}
+    envFilter=s.envFilter||'all';hasEnv=!!s.hasEnv;
+    els.fileHint.textContent=curName||'(vue enregistrée)';
+    buildConfig(); // pour que « Modifier la sélection » reste utilisable
+    if(map){if(trackLayer)map.removeLayer(trackLayer);trackLayer=L.polyline(curPts.map(p=>[p.lat,p.lon]),{color:'#ff6b35',weight:3,opacity:.85}).addTo(map);}
+    if(s.stat){els.statDist.textContent=s.stat.dist;els.statCurves.textContent=s.stat.curves;els.statExtra.textContent=s.stat.extra;if(s.stat.extraLbl)els.statExtraLbl.textContent=s.stat.extraLbl;}
+    els.configPanel.hidden=true;els.resultsPanel.hidden=false;$('gmapsBtn').hidden=false;$('mymapsBtn').hidden=false;
+    drawEvents();applyVis();renderLayerList();renderTable();renderEnv();
+    if(map){try{if(s.mv&&s.mv.c)map.setView(s.mv.c,s.mv.z);else map.fitBounds(trackLayer.getBounds(),{padding:[30,30]});}catch(e){}setTimeout(()=>{try{map.invalidateSize();}catch(e){}},200);}
+    setStatus('Vue restaurée (aucun rechargement nécessaire).','ok');
+  }
+  function saveView(){
+    if(!curPts){setStatus('Charge et analyse une trace avant d\'enregistrer la vue.','error');return;}
+    const id=Math.random().toString(36).slice(2,10);
+    try{localStorage.setItem('idmap_view_'+id,JSON.stringify(serializeState()));}
+    catch(e){setStatus('Impossible d\'enregistrer (stockage indisponible ou plein).','error');return;}
+    const link=location.origin+location.pathname+'#v='+id;
+    try{history.replaceState(null,'','#v='+id);}catch(e){try{location.hash='v='+id;}catch(e2){}}
+    const box=$('saveBox');box.hidden=false;$('saveLink').value=link;
+    try{navigator.clipboard.writeText(link).then(()=>{},()=>{});setStatus('✅ Vue enregistrée — lien copié (valable sur cet appareil/navigateur).','ok');}
+    catch(e){setStatus('✅ Vue enregistrée — copie le lien ci-dessous.','ok');}
+  }
+  $('saveBtn').addEventListener('click',saveView);
+  $('copyLink').addEventListener('click',()=>{const i=$('saveLink');i.select();try{navigator.clipboard.writeText(i.value);}catch(e){}try{document.execCommand('copy');}catch(e){}});
+
   function readFile(file){if(!file)return;curName=file.name;els.fileHint.textContent=file.name;const r=new FileReader();r.onload=()=>{try{loadPts(r.result);}catch(e){setStatus('⚠️ '+e.message,'error');showBanner(e.message);}};r.onerror=()=>setStatus('Impossible de lire le fichier.','error');r.readAsText(file);}
   $('fileInput').addEventListener('change',e=>readFile(e.target.files[0]));
   els.runBtn.addEventListener('click',()=>{setStatus('<span class="spinner"></span>Analyse…');setTimeout(analyze,30);});
@@ -1295,6 +1340,16 @@ svg.leaflet-image-layer.leaflet-interactive path {
   window.addEventListener('drop',e=>{e.preventDefault();dragDepth=0;document.body.classList.remove('dragging');if(e.dataTransfer.files&&e.dataTransfer.files[0])readFile(e.dataTransfer.files[0]);});
 
   if(!hasLeaflet)setStatus('Carte non disponible (Leaflet non chargé). L\'analyse fonctionne quand même.','error');
+
+  // Restauration d'une vue enregistrée via le lien #v=<id>
+  function tryRestoreFromHash(silent){const m=(location.hash||'').match(/^#v=([A-Za-z0-9]+)/);if(!m)return;
+    try{const raw=localStorage.getItem('idmap_view_'+m[1]);
+      if(!raw){if(!silent)setStatus('Vue introuvable sur cet appareil (les vues sont enregistrées localement dans ce navigateur).','error');return;}
+      restoreState(JSON.parse(raw));
+    }catch(e){console.error(e);if(!silent)setStatus('Vue enregistrée illisible.','error');}
+  }
+  tryRestoreFromHash(false);
+  window.addEventListener('hashchange',()=>tryRestoreFromHash(true));
 })();
 </script>
 </body>
