@@ -1352,13 +1352,14 @@ svg.leaflet-image-layer.leaflet-interactive path {
     const id=Math.random().toString(36).slice(2,10);
     const json=JSON.stringify(serializeState());
     try{localStorage.setItem('idmap_view_'+id,json);}catch(e){}
-    let link=location.origin+location.pathname+'#v='+id,cloud=false;
+    let link=location.origin+location.pathname+'#v='+id,cloud=false,cloudKo=0;
     if(CLOUD){
       setStatus('<span class="spinner"></span>Enregistrement dans le cloud…');
       try{const db=await cloudReady;if(!db)throw new Error(cloudErr||'cloud indisponible');
         let payload=json,gz=false;
         if(typeof CompressionStream!=='undefined'){try{payload=await gzipStr(json);gz=true;}catch(e){payload=json;gz=false;}}
-        if(payload.length>=1000000)throw new Error('trace trop volumineuse ('+Math.round(payload.length/1024)+' Ko compressés)');
+        cloudKo=Math.round(payload.length/1024);
+        if(payload.length>=1000000)throw new Error('trace trop volumineuse ('+cloudKo+' Ko compressés)');
         await db.collection('views').doc(id).set({data:payload,gz,created:Date.now()});
         link=location.origin+location.pathname+'?id='+id;cloud=true;
       }catch(e){const msg=(e&&(e.code||e.message))||'inconnue';console.error(e);setStatus('⚠️ Cloud indisponible ('+msg+') — lien local généré (cet appareil seulement).','error');}
@@ -1366,7 +1367,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     if(!cloud){try{history.replaceState(null,'','#v='+id);}catch(e){}}
     const box=$('saveBox');box.hidden=false;$('saveLink').value=link;
     try{navigator.clipboard.writeText(link);}catch(e){}
-    if(cloud)setStatus('✅ Vue enregistrée dans le cloud — lien partageable copié (fonctionne sur tout appareil).','ok');
+    if(cloud)setStatus('✅ Vue enregistrée dans le cloud ('+cloudKo+' Ko) — lien partageable copié (fonctionne sur tout appareil).','ok');
     else setStatus('✅ Vue enregistrée — lien copié (cet appareil/navigateur).','ok');
   }
   $('saveBtn').addEventListener('click',saveView);
