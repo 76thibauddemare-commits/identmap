@@ -893,14 +893,19 @@ svg.leaflet-image-layer.leaflet-interactive path {
   };
   const FIREBASE_CONFIG = (typeof window!=='undefined'&&window.IDMAP_FIREBASE_CONFIG)||INLINE_FIREBASE_CONFIG;
   const CLOUD = !!(FIREBASE_CONFIG&&FIREBASE_CONFIG.projectId);
-  let cloudDb=null;
-  function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('load '+src));document.head.appendChild(s);});}
+  let cloudDb=null,cloudErr='';
+  function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('script KO'));document.head.appendChild(s);});}
+  async function loadFirebaseSDK(){if(typeof firebase!=='undefined')return true;
+    for(const v of ['10.12.2','9.23.0','10.7.1']){
+      try{await loadScript('https://www.gstatic.com/firebasejs/'+v+'/firebase-app-compat.js');
+          await loadScript('https://www.gstatic.com/firebasejs/'+v+'/firebase-firestore-compat.js');
+          if(typeof firebase!=='undefined')return true;}catch(e){cloudErr='SDK '+v+' non chargé';}
+    }
+    return typeof firebase!=='undefined';}
   const cloudReady=(async()=>{if(!CLOUD)return null;
-    try{if(typeof firebase==='undefined'){
-      await loadScript('https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js');
-      await loadScript('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js');}
+    try{const ok=await loadFirebaseSDK();if(!ok)throw new Error('SDK Firebase non chargé');
       firebase.initializeApp(FIREBASE_CONFIG);cloudDb=firebase.firestore();return cloudDb;
-    }catch(e){console.error('Firebase init',e);return null;}})();
+    }catch(e){cloudErr=(e&&(e.code||e.message))||'init';console.error('Firebase init',e);return null;}})();
   const hasLeaflet=typeof L!=='undefined';
   if(hasLeaflet){ try{
     map=L.map('map',{zoomControl:true}).setView([46.6,2.5],6);
@@ -1344,11 +1349,11 @@ svg.leaflet-image-layer.leaflet-interactive path {
     let link=location.origin+location.pathname+'#v='+id,cloud=false;
     if(CLOUD){
       setStatus('<span class="spinner"></span>Enregistrement dans le cloud…');
-      try{const db=await cloudReady;if(!db)throw new Error('cloud indisponible');
+      try{const db=await cloudReady;if(!db)throw new Error(cloudErr||'cloud indisponible');
         if(json.length>900000)throw new Error('trace trop volumineuse pour le cloud');
         await db.collection('views').doc(id).set({data:json,created:Date.now()});
         link=location.origin+location.pathname+'?id='+id;cloud=true;
-      }catch(e){console.error(e);setStatus('⚠️ Cloud indisponible — lien local généré (cet appareil seulement).','error');}
+      }catch(e){const msg=(e&&(e.code||e.message))||'inconnue';console.error(e);setStatus('⚠️ Cloud indisponible ('+msg+') — lien local généré (cet appareil seulement).','error');}
     }
     if(!cloud){try{history.replaceState(null,'','#v='+id);}catch(e){}}
     const box=$('saveBox');box.hidden=false;$('saveLink').value=link;
