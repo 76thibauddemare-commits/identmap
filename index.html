@@ -1319,6 +1319,12 @@ svg.leaflet-image-layer.leaflet-interactive path {
     setStatus('✅ KML téléchargé. Dans Google My Maps (ouvert dans l\'onglet) : « Créer une carte » → « Importer » → choisis le fichier .kml → le tracé fidèle et les événements s\'affichent.','ok');
   });
 
+  // ===== Compression (gzip natif) pour faire tenir les longs tracés dans Firestore =====
+  function u8ToB64(u8){let s='';const c=0x8000;for(let i=0;i<u8.length;i+=c)s+=String.fromCharCode.apply(null,u8.subarray(i,i+c));return btoa(s);}
+  function b64ToU8(b){const bin=atob(b),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u;}
+  async function gzipStr(str){const cs=new CompressionStream('gzip');const w=cs.writable.getWriter();w.write(new TextEncoder().encode(str));w.close();const ab=await new Response(cs.readable).arrayBuffer();return u8ToB64(new Uint8Array(ab));}
+  async function gunzipB64(b64){const ds=new DecompressionStream('gzip');const w=ds.writable.getWriter();w.write(b64ToU8(b64));w.close();const ab=await new Response(ds.readable).arrayBuffer();return new TextDecoder().decode(ab);}
+
   // ===== Enregistrer / restaurer une vue (localStorage + lien #v=id) =====
   function serializeState(){
     const clean={};
@@ -1350,8 +1356,10 @@ svg.leaflet-image-layer.leaflet-interactive path {
     if(CLOUD){
       setStatus('<span class="spinner"></span>Enregistrement dans le cloud…');
       try{const db=await cloudReady;if(!db)throw new Error(cloudErr||'cloud indisponible');
-        if(json.length>900000)throw new Error('trace trop volumineuse pour le cloud');
-        await db.collection('views').doc(id).set({data:json,created:Date.now()});
+        let payload=json,gz=false;
+        if(typeof CompressionStream!=='undefined'){try{payload=await gzipStr(json);gz=true;}catch(e){payload=json;gz=false;}}
+        if(payload.length>=1000000)throw new Error('trace trop volumineuse ('+Math.round(payload.length/1024)+' Ko compressés)');
+        await db.collection('views').doc(id).set({data:payload,gz,created:Date.now()});
         link=location.origin+location.pathname+'?id='+id;cloud=true;
       }catch(e){const msg=(e&&(e.code||e.message))||'inconnue';console.error(e);setStatus('⚠️ Cloud indisponible ('+msg+') — lien local généré (cet appareil seulement).','error');}
     }
@@ -1389,7 +1397,8 @@ svg.leaflet-image-layer.leaflet-interactive path {
       try{const db=await cloudReady;if(!db)throw new Error('cloud');
         const doc=await db.collection('views').doc(cid).get();
         if(!doc.exists){setStatus('Vue introuvable (lien expiré ou supprimé).','error');return;}
-        restoreState(JSON.parse(doc.data().data));
+        const dd=doc.data();const jsonStr=dd.gz?await gunzipB64(dd.data):dd.data;
+        restoreState(JSON.parse(jsonStr));
       }catch(e){console.error(e);setStatus('Impossible de charger la vue depuis le cloud.','error');}
       return;
     }
