@@ -33,6 +33,15 @@ une carte interactive avec un **tableau de synthèse trié par kilomètre**.
    ⚠️ Par défaut la vue est stockée dans le navigateur (localStorage) : le lien
    `#v=<id>` fonctionne sur le **même appareil/navigateur**.
 
+## Priorités (points manuels)
+
+Dans les résultats, le bouton **« 📍 Ajouter une priorité »** active un mode où
+un clic sur la carte pose un repère « priorité » (avec un nom au choix). Ces
+priorités apparaissent comme une **couche à part** dans la liste de droite
+(compteur, affichage/masquage) et dans le tableau (avec leur kilomètre), se
+suppriment via la croix ✕, sont **enregistrées avec la vue** et **exportées en
+KML** (My Maps).
+
 ## Partage entre appareils (optionnel — Firebase Firestore)
 
 Si une config Firebase est fournie, « Enregistrer la vue » écrit dans **Firestore**

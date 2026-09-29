@@ -721,6 +721,10 @@ svg.leaflet-image-layer.leaflet-interactive path {
   .envseg button{flex:1;background:var(--panel-2);color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:8px 6px;font-size:13px;font-weight:600;cursor:pointer;}
   .envseg button.on{background:var(--accent);color:#fff;border-color:var(--accent);}
   .envseg button:disabled{opacity:.4;cursor:not-allowed;}
+  .prio-bar{display:flex;align-items:center;gap:10px;padding:8px 16px 0;}
+  .prio-bar button{background:#ffd24a;color:#20242c;border:none;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;}
+  .prio-bar button.on{background:#ff6b35;color:#fff;}
+  .delp{color:#ff7b72;font-weight:700;cursor:pointer;margin-left:8px;padding:0 4px;}
   .layers{padding:6px 12px 10px;border-bottom:1px solid var(--border);max-height:30vh;overflow-y:auto;}
   .layer-row{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:8px;cursor:pointer;}
   .layer-row:hover{background:var(--panel-2);}
@@ -787,6 +791,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
           <button data-env="urban">En ville</button>
           <button data-env="rural">Hors ville</button>
         </div>
+        <div class="prio-bar"><button id="prioBtn">📍 Ajouter une priorité</button><span class="note" id="prioHint"></span></div>
         <div class="panel-head"><span>Afficher sur la carte</span></div>
         <div class="layers"><div id="layerList"></div></div>
         <div class="table-wrap">
@@ -868,6 +873,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     unlit:      {cat:'attr',label:'Non éclairé',color:'#6e7681',kind:'span',def:false,way:true},
     incline:    {cat:'attr',label:'Pente signalée (OSM)',color:'#ffa657',kind:'span',def:false,way:true},
     zone30:     {cat:'attr',label:'Zone à basse vitesse (≤30)',color:'#ff9bce',kind:'span',def:false,way:true},
+    priority:   {cat:'annot',label:'Priorités',color:'#ffd24a',kind:'point',def:true,manual:true},
   };
   const ORDER=Object.keys(TYPES);
   const CURVE_TYPES=['curve_50','curve_100','curve_300','curve_500','curve_500p'];
@@ -879,6 +885,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   const layerGroups={},enabled={},selected={};
   let events={},curPts=null,curDist=null,hasEle=false,curName='';
   let envFilter='all',hasEnv=false;
+  let priorities=[],addMode=false,curTrackIndex=null;
 
   // ====== Firebase (optionnel : partage des vues entre appareils) ======
   // Colle ta config Web Firebase dans INLINE_FIREBASE_CONFIG (ou via window.IDMAP_FIREBASE_CONFIG).
@@ -1060,6 +1067,15 @@ svg.leaflet-image-layer.leaflet-interactive path {
   // ================= Rendu =================
   function fmtDist(m){return m>=1000?(m/1000).toFixed(m>=10000?0:1)+' km':Math.round(m)+' m';}
   function matchEnv(ev){return envFilter==='all'?true:envFilter==='urban'?ev.urban===true:ev.urban!==true;}
+  // ----- Priorités (points posés manuellement) -----
+  function setProjection(){if(!curPts||curPts.length<2){curTrackIndex=null;return;}
+    const res=resample(curPts,STEP);const rcum=[0];for(let i=1;i<res.length;i++)rcum.push(rcum[i-1]+haversine(res[i-1],res[i]));
+    curTrackIndex=buildTrackIndex(res,rcum);}
+  function nearestKm(lat,lon){if(!curTrackIndex)return {dist:0,meters:0};return curTrackIndex.query(lat,lon);}
+  function refreshPriorities(){events.priority=priorities.slice();selected.priority=true;enabled.priority=priorities.length>0;if(map){drawEvents();applyVis();}renderLayerList();renderTable();}
+  function addPriority(latlng){const nr=nearestKm(latlng.lat,latlng.lng);const def='Priorité '+(priorities.length+1);const note=window.prompt('Nom de la priorité (optionnel) :',def);if(note===null)return;
+    priorities.push({id:'p'+Date.now().toString(36)+Math.floor(Math.random()*1000),lat:latlng.lat,lon:latlng.lng,meters:nr.meters,detail:note||def,badge:'★',urban:null});refreshPriorities();}
+  function removePriority(id){priorities=priorities.filter(p=>p.id!==id);refreshPriorities();}
   function evIcon(t,txt){return L.divIcon({className:'',html:`<div class="ev-marker" style="background:${TYPES[t].color}">${txt||''}</div>`,iconSize:[22,22],iconAnchor:[11,11]});}
   function drawEvents(){if(!map)return;for(const t of ORDER){const lg=layerGroups[t];if(!lg)continue;lg.clearLayers();
     (events[t]||[]).forEach(ev=>{if(!matchEnv(ev))return;if(TYPES[t].kind==='span'&&ev.path&&ev.path.length>1)L.polyline(ev.path.map(p=>[p.lat,p.lon]),{color:TYPES[t].color,weight:7,opacity:.8}).addTo(lg);
@@ -1091,8 +1107,10 @@ svg.leaflet-image-layer.leaflet-interactive path {
     if(!rows.length){els.tableBox.style.display='none';els.emptyState.style.display='block';els.emptyState.innerHTML='Aucun événement à afficher.<br>Coche un type ci-dessus.';return;}
     els.emptyState.style.display='none';els.tableBox.style.display='table';
     for(const {t,ev} of rows){const tr=document.createElement('tr');
-      tr.innerHTML=`<td><span class="ev-dot" style="background:${TYPES[t].color}"></span><span class="ev-type">${TYPES[t].label}</span></td><td class="km">${(ev.meters/1000).toFixed(2)}</td><td class="ev-type">${ev.detail||''}</td>`;
+      const del=t==='priority'?`<span class="delp" data-id="${ev.id}" title="Supprimer">✕</span>`:'';
+      tr.innerHTML=`<td><span class="ev-dot" style="background:${TYPES[t].color}"></span><span class="ev-type">${TYPES[t].label}</span></td><td class="km">${(ev.meters/1000).toFixed(2)}</td><td class="ev-type">${ev.detail||''}${del}</td>`;
       tr.addEventListener('click',()=>{if(map){map.setView([ev.lat,ev.lon],16,{animate:true});if(ev._m)ev._m.openPopup();}});
+      if(t==='priority'){const d=tr.querySelector('.delp');if(d)d.addEventListener('click',e2=>{e2.stopPropagation();removePriority(ev.id);});}
       els.tableBody.appendChild(tr);}}
 
   // ================= Panneau de configuration =================
@@ -1122,6 +1140,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     try{
       const sel=selectedTypes();const selSet=new Set(sel);
       for(const t of ORDER) selected[t]=selSet.has(t);
+      selected.priority=true; // couche manuelle toujours disponible
       envFilter='all';hasEnv=false;
       els.configPanel.hidden=true;els.resultsPanel.hidden=false;
       const pts=curPts,dist=curDist;
@@ -1239,6 +1258,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
         window.__failT=failT;
       }
 
+      events.priority=priorities.slice(); // priorités posées manuellement (préservées entre analyses)
       for(const t of ORDER)(events[t]||[]).sort((a,b)=>a.meters-b.meters);
       try{window.__events=events;}catch(e){}
       for(const t of ORDER)enabled[t]=selected[t]&&TYPES[t].def&&(events[t]||[]).length>0;
@@ -1283,6 +1303,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   function loadPts(text){
     const b=$('errBanner');if(b)b.style.display='none';
     const pts=parseTrack(text);const dist=buildDistances(pts);curPts=pts;curDist=dist;hasEle=eleRatio(pts)>=0.5;
+    setProjection();priorities=[];
     if(map){if(trackLayer)map.removeLayer(trackLayer);trackLayer=L.polyline(pts.map(p=>[p.lat,p.lon]),{color:'#ff6b35',weight:3,opacity:.85}).addTo(map);
       try{map.fitBounds(trackLayer.getBounds(),{padding:[30,30]});}catch(e){}setTimeout(()=>{try{map.invalidateSize();}catch(e){}},200);}
     els.configPanel.hidden=false;els.resultsPanel.hidden=true;
@@ -1334,9 +1355,11 @@ svg.leaflet-image-layer.leaflet-interactive path {
       stat:{dist:els.statDist.textContent,curves:els.statCurves.textContent,extra:els.statExtra.textContent,extraLbl:els.statExtraLbl.textContent},mv};
   }
   function restoreState(s){
-    curName=s.name||'';curPts=s.pts;hasEle=!!s.hasEle;curDist=buildDistances(curPts);
+    curName=s.name||'';curPts=s.pts;hasEle=!!s.hasEle;curDist=buildDistances(curPts);setProjection();
     events={};for(const t of ORDER)events[t]=(s.events&&s.events[t])?s.events[t]:[];
+    priorities=(events.priority||[]).slice();
     for(const t of ORDER){selected[t]=!!(s.selected&&s.selected[t]);enabled[t]=!!(s.enabled&&s.enabled[t]);}
+    selected.priority=true;
     envFilter=s.envFilter||'all';hasEnv=!!s.hasEnv;
     els.fileHint.textContent=curName||'(vue enregistrée)';
     buildConfig(); // pour que « Modifier la sélection » reste utilisable
@@ -1378,6 +1401,8 @@ svg.leaflet-image-layer.leaflet-interactive path {
   els.runBtn.addEventListener('click',()=>{setStatus('<span class="spinner"></span>Analyse…');setTimeout(analyze,30);});
   $('backBtn').addEventListener('click',()=>{els.resultsPanel.hidden=true;els.configPanel.hidden=false;});
   $('envSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;envFilter=b.dataset.env;renderEnv();drawEvents();applyVis();renderLayerList();renderTable();});
+  $('prioBtn').addEventListener('click',()=>{addMode=!addMode;const b=$('prioBtn');b.textContent=addMode?'📍 Clique la carte pour poser…':'📍 Ajouter une priorité';b.classList.toggle('on',addMode);$('prioHint').textContent=addMode?'(clique un point du trajet)':'';if(map)try{map.getContainer().style.cursor=addMode?'crosshair':'';}catch(e){}});
+  if(map)map.on('click',e=>{if(addMode)addPriority(e.latlng);});
   let dragDepth=0;
   window.addEventListener('dragenter',e=>{e.preventDefault();dragDepth++;document.body.classList.add('dragging');});
   window.addEventListener('dragover',e=>e.preventDefault());
