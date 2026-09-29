@@ -33,14 +33,17 @@ une carte interactive avec un **tableau de synthèse trié par kilomètre**.
    ⚠️ Par défaut la vue est stockée dans le navigateur (localStorage) : le lien
    `#v=<id>` fonctionne sur le **même appareil/navigateur**.
 
-## Priorités (points manuels)
+## Repères perso (points manuels)
 
-Dans les résultats, le bouton **« 📍 Ajouter une priorité »** active un mode où
-un clic sur la carte pose un repère « priorité » (avec un nom au choix). Ces
-priorités apparaissent comme une **couche à part** dans la liste de droite
+Dans les résultats, le bouton **« 📍 Ajouter un repère »** active un mode où
+un clic sur la carte pose un repère (avec un nom au choix). Ces repères
+apparaissent comme une **couche à part** dans la liste de droite
 (compteur, affichage/masquage) et dans le tableau (avec leur kilomètre), se
-suppriment via la croix ✕, sont **enregistrées avec la vue** et **exportées en
+suppriment via la croix ✕, sont **enregistrés avec la vue** et **exportés en
 KML** (My Maps).
+
+> À ne pas confondre avec l'événement **« Priorité à droite »** (détection
+> automatique de la règle de circulation), listé plus haut.
 
 ## Partage entre appareils (optionnel — Firebase Firestore)
 
@@ -90,6 +93,8 @@ carte et Overpass).
 **Topologie & régulation** (OpenStreetMap)
 - Ronds-points / giratoires / mini ronds-points, Échangeurs, Bretelles
 - Intersections (toutes) et **intersections en virage** (prise / traversée)
+- **Priorité à droite** : intersections non signalées (sans stop/cédez/feu/
+  rond-point) sur voies mineures, où l'on cède le passage à droite (heuristique OSM)
 - Feux tricolores, STOP, Cédez-le-passage, Passages piétons, Passages à niveau
 - Ralentisseurs, Chicanes, Radars, Péages, Barrières / bornes
 - Traversées d'agglomération, Zones scolaires, Arrêts de bus, Gués,

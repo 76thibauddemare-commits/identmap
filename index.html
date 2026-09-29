@@ -791,7 +791,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
           <button data-env="urban">En ville</button>
           <button data-env="rural">Hors ville</button>
         </div>
-        <div class="prio-bar"><button id="prioBtn">📍 Ajouter une priorité</button><span class="note" id="prioHint"></span></div>
+        <div class="prio-bar"><button id="prioBtn">📍 Ajouter un repère</button><span class="note" id="prioHint"></span></div>
         <div class="panel-head"><span>Afficher sur la carte</span></div>
         <div class="layers"><div id="layerList"></div></div>
         <div class="table-wrap">
@@ -843,6 +843,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     interchange:{cat:'topo',label:'Échangeurs',color:'#a371f7',kind:'point',def:true,node:{tag:'highway',val:'motorway_junction'},thr:90},
     ramp:       {cat:'topo',label:'Bretelles (entrée/sortie)',color:'#bc8cff',kind:'span',def:false,way:true},
     intersection:{cat:'topo',label:'Intersections (toutes)',color:'#6e7681',kind:'point',def:false,way:true,inter:true},
+    priorite_droite:{cat:'topo',label:'Priorité à droite',color:'#ff4d4d',kind:'point',def:true,way:true,inter:true},
     turn_curve: {cat:'topo',label:'Intersection prise en virage',color:'#f778ba',kind:'point',def:true,way:true,inter:true},
     cross_curve:{cat:'topo',label:'Intersection traversée en virage',color:'#3fb0ff',kind:'point',def:true,way:true,inter:true},
     traffic_signals:{cat:'topo',label:'Feux tricolores',color:'#e34c4c',kind:'point',def:true,node:{tag:'highway',val:'traffic_signals'}},
@@ -873,7 +874,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     unlit:      {cat:'attr',label:'Non éclairé',color:'#6e7681',kind:'span',def:false,way:true},
     incline:    {cat:'attr',label:'Pente signalée (OSM)',color:'#ffa657',kind:'span',def:false,way:true},
     zone30:     {cat:'attr',label:'Zone à basse vitesse (≤30)',color:'#ff9bce',kind:'span',def:false,way:true},
-    priority:   {cat:'annot',label:'Priorités',color:'#ffd24a',kind:'point',def:true,manual:true},
+    priority:   {cat:'annot',label:'Repères perso',color:'#ffd24a',kind:'point',def:true,manual:true},
   };
   const ORDER=Object.keys(TYPES);
   const CURVE_TYPES=['curve_50','curve_100','curve_300','curve_500','curve_500p'];
@@ -1063,6 +1064,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   const BAD_SURF=new Set(['unpaved','gravel','fine_gravel','compacted','dirt','ground','earth','sand','grass','mud','pebblestone','rock']);
   const CATFAM={motorway:'Autoroute',trunk:'Voie rapide',primary:'Nationale',secondary:'Départementale',tertiary:'Départementale',unclassified:'Route locale',residential:'Rue',living_street:'Zone de rencontre',road:'Route',track:'Chemin'};
   const stripFam=h=>CATFAM[(h||'').replace(/_link$/,'')]||null;
+  function hwRank(h){h=(h||'').replace(/_link$/,'');return (h==='motorway'||h==='trunk')?5:h==='primary'?4:h==='secondary'?3:h==='tertiary'?2:1;}
 
   // ================= Rendu =================
   function fmtDist(m){return m>=1000?(m/1000).toFixed(m>=10000?0:1)+' km':Math.round(m)+' m';}
@@ -1073,7 +1075,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     curTrackIndex=buildTrackIndex(res,rcum);}
   function nearestKm(lat,lon){if(!curTrackIndex)return {dist:0,meters:0};return curTrackIndex.query(lat,lon);}
   function refreshPriorities(){events.priority=priorities.slice();selected.priority=true;enabled.priority=priorities.length>0;if(map){drawEvents();applyVis();}renderLayerList();renderTable();}
-  function addPriority(latlng){const nr=nearestKm(latlng.lat,latlng.lng);const def='Priorité '+(priorities.length+1);const note=window.prompt('Nom de la priorité (optionnel) :',def);if(note===null)return;
+  function addPriority(latlng){const nr=nearestKm(latlng.lat,latlng.lng);const def='Repère '+(priorities.length+1);const note=window.prompt('Nom du repère (optionnel) :',def);if(note===null)return;
     priorities.push({id:'p'+Date.now().toString(36)+Math.floor(Math.random()*1000),lat:latlng.lat,lon:latlng.lng,meters:nr.meters,detail:note||def,badge:'★',urban:null});refreshPriorities();}
   function removePriority(id){priorities=priorities.filter(p=>p.id!==id);refreshPriorities();}
   function evIcon(t,txt){return L.divIcon({className:'',html:`<div class="ev-marker" style="background:${TYPES[t].color}">${txt||''}</div>`,iconSize:[22,22],iconAnchor:[11,11]});}
@@ -1179,11 +1181,12 @@ svg.leaflet-image-layer.leaflet-interactive path {
       if(nodeTypes.length||needWays){
         setStatus('<span class="spinner"></span>Analyse OpenStreetMap…');
         const tiles=bboxTiles(pts,250,0.0012);
-        const ways=[],wayseen=new Set(),osmNodes=[],nodeDeg=new Map(),nodePts=new Map();
+        const ways=[],wayseen=new Set(),osmNodes=[],nodeDeg=new Map(),nodePts=new Map(),nodeRank=new Map();
         let okT=0,failT=0;
         // fragments de requête
         const frags=[];if(needWays)frags.push(`way["highway"~"${HW}"]__B__;`);
         const nodeSel=new Set();for(const t of nodeTypes)nodeSel.add(nodeSelector(TYPES[t].node));if(needMini)nodeSel.add('["highway"="mini_roundabout"]');
+        if(selSet.has('priorite_droite')){nodeSel.add('["highway"="traffic_signals"]');nodeSel.add('["highway"="stop"]');nodeSel.add('["highway"="give_way"]');} // pour exclure les intersections signalées
         for(const s of nodeSel)frags.push(`node${s}__B__;`);
         for(const t of nodeTypes)if(TYPES[t].areaSel)frags.push(`way${TYPES[t].areaSel}__B__;`); // zones (écoles)
         for(let i=0;i<tiles.length;i++){
@@ -1194,7 +1197,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
             for(const el of (data.elements||[])){
               if(el.type==='node') osmNodes.push(el);
               else if(el.type==='way'&&el.geometry&&el.nodes){if(wayseen.has(el.id))continue;wayseen.add(el.id);ways.push(el);
-                if(el.tags&&el.tags.highway) for(let j=0;j<el.nodes.length;j++){const id=el.nodes[j],g=el.geometry[j];if(!g)continue;nodePts.set(id,g);nodeDeg.set(id,(nodeDeg.get(id)||0)+((j===0||j===el.nodes.length-1)?1:2));}}
+                if(el.tags&&el.tags.highway){const rk=hwRank(el.tags.highway);for(let j=0;j<el.nodes.length;j++){const id=el.nodes[j],g=el.geometry[j];if(!g)continue;nodePts.set(id,g);nodeDeg.set(id,(nodeDeg.get(id)||0)+((j===0||j===el.nodes.length-1)?1:2));nodeRank.set(id,Math.max(nodeRank.get(id)||0,rk));}}}
             }
           }catch(e){failT++;console.warn('zone',i+1,e.message);}
         }
@@ -1239,10 +1242,17 @@ svg.leaflet-image-layer.leaflet-interactive path {
         // Intersections (degré>=3) — toutes / en virage
         if(needInter){const cand=[];for(const [id,deg] of nodeDeg){if(deg<3)continue;const g=nodePts.get(id);if(!g)continue;const nr=near(g);if(nr.dist>14)continue;cand.push({id,lat:g.lat,lon:g.lon,meters:nr.meters});}
           cand.sort((a,b)=>a.meters-b.meters);let last=-1e9;
+          const pad=selSet.has('priorite_droite');
+          const controls=pad?osmNodes.filter(n=>n.tags&&/^(traffic_signals|stop|give_way)$/.test(n.tags.highway||'')):[];
           for(const it of cand){if(it.meters-last<25)continue;last=it.meters;const inCurve=headingChangeAt(it.meters,26,geo)>=20;const turn=headingChangeAt(it.meters,32,geo);
             if(selSet.has('intersection')) events.intersection.push({lat:it.lat,lon:it.lon,meters:it.meters,detail:'Intersection'+(inCurve?' (en virage)':'')});
             if(inCurve){if(turn>=35){if(selSet.has('turn_curve'))events.turn_curve.push({lat:it.lat,lon:it.lon,meters:it.meters,detail:'Virée '+Math.round(turn)+'°'});}
-              else{if(selSet.has('cross_curve'))events.cross_curve.push({lat:it.lat,lon:it.lon,meters:it.meters,detail:'Traversée '+Math.round(turn)+'°'});}}}
+              else{if(selSet.has('cross_curve'))events.cross_curve.push({lat:it.lat,lon:it.lon,meters:it.meters,detail:'Traversée '+Math.round(turn)+'°'});}}
+            // Priorité à droite : intersection non signalée sur voies mineures, hors rond-point
+            if(pad&&(nodeRank.get(it.id)||1)<=2&&!inRound(it.lat,it.lon)){
+              const ctrl=controls.some(c=>haversine({lat:c.lat,lon:c.lon},{lat:it.lat,lon:it.lon})<=18);
+              if(!ctrl) events.priorite_droite.push({lat:it.lat,lon:it.lon,meters:it.meters,detail:'Céder à droite'});
+            }}
         }
         // Changements d'attributs (map-matching léger)
         if(needAttr){const ch=attrChanges(buckets,attrWant);
@@ -1401,7 +1411,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   els.runBtn.addEventListener('click',()=>{setStatus('<span class="spinner"></span>Analyse…');setTimeout(analyze,30);});
   $('backBtn').addEventListener('click',()=>{els.resultsPanel.hidden=true;els.configPanel.hidden=false;});
   $('envSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;envFilter=b.dataset.env;renderEnv();drawEvents();applyVis();renderLayerList();renderTable();});
-  $('prioBtn').addEventListener('click',()=>{addMode=!addMode;const b=$('prioBtn');b.textContent=addMode?'📍 Clique la carte pour poser…':'📍 Ajouter une priorité';b.classList.toggle('on',addMode);$('prioHint').textContent=addMode?'(clique un point du trajet)':'';if(map)try{map.getContainer().style.cursor=addMode?'crosshair':'';}catch(e){}});
+  $('prioBtn').addEventListener('click',()=>{addMode=!addMode;const b=$('prioBtn');b.textContent=addMode?'📍 Clique la carte pour poser…':'📍 Ajouter un repère';b.classList.toggle('on',addMode);$('prioHint').textContent=addMode?'(clique un point du trajet)':'';if(map)try{map.getContainer().style.cursor=addMode?'crosshair':'';}catch(e){}});
   if(map)map.on('click',e=>{if(addMode)addPriority(e.latlng);});
   let dragDepth=0;
   window.addEventListener('dragenter',e=>{e.preventDefault();dragDepth++;document.body.classList.add('dragging');});
