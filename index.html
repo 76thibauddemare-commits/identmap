@@ -1014,6 +1014,9 @@ svg.leaflet-image-layer.leaflet-interactive path {
   function finLD(r){const mid=r.path[Math.floor(r.path.length/2)];const drop=r.path[0].ele-r.path[r.path.length-1].ele;return {lat:mid.lat,lon:mid.lon,meters:r.startM,detail:`descente ${fmtDist(r.endM-r.startM)} (-${Math.round(drop)} m)`,path:r.path.map(p=>({lat:p.lat,lon:p.lon}))};}
   function headingChangeAt(m,win,geo){const {res,rcum}=geo;const at=x=>{let lo=0,hi=rcum.length-1;while(lo<hi){const mid=(lo+hi)>>1;if(rcum[mid]<x)lo=mid+1;else hi=mid;}return Math.max(0,Math.min(res.length-1,lo));};
     const a=at(m-win),b=at(m),c=at(m+win);if(a>=b||b>=c)return 0;return Math.abs(angleDiff(bearing(res[a],res[b]),bearing(res[b],res[c])));}
+  // Cap (direction de circulation) du tracé autour d'un km
+  function headingAt(m,win,geo){const {res,rcum}=geo;const at=x=>{let lo=0,hi=rcum.length-1;while(lo<hi){const mid=(lo+hi)>>1;if(rcum[mid]<x)lo=mid+1;else hi=mid;}return Math.max(0,Math.min(res.length-1,lo));};
+    const a=at(m-win),b=at(m+win);if(a>=b)return 0;return bearing(res[a],res[b]);}
   function spanPath(geo,startM,endM){const out=[];for(let i=0;i<geo.res.length;i++){if(geo.rcum[i]>=startM-1&&geo.rcum[i]<=endM+1)out.push(geo.res[i]);}return out.length>1?out:[geo.res[0],geo.res[1]];}
 
   // ================= Altitude =================
@@ -1181,7 +1184,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
       if(nodeTypes.length||needWays){
         setStatus('<span class="spinner"></span>Analyse OpenStreetMap…');
         const tiles=bboxTiles(pts,250,0.0012);
-        const ways=[],wayseen=new Set(),osmNodes=[],nodeDeg=new Map(),nodePts=new Map(),nodeRank=new Map();
+        const ways=[],wayseen=new Set(),osmNodes=[],nodeDeg=new Map(),nodePts=new Map(),nodeRank=new Map(),nodeBranches=new Map(),nodePrio=new Set();
         let okT=0,failT=0;
         // fragments de requête
         const frags=[];if(needWays)frags.push(`way["highway"~"${HW}"]__B__;`);
@@ -1197,7 +1200,13 @@ svg.leaflet-image-layer.leaflet-interactive path {
             for(const el of (data.elements||[])){
               if(el.type==='node') osmNodes.push(el);
               else if(el.type==='way'&&el.geometry&&el.nodes){if(wayseen.has(el.id))continue;wayseen.add(el.id);ways.push(el);
-                if(el.tags&&el.tags.highway){const rk=hwRank(el.tags.highway);for(let j=0;j<el.nodes.length;j++){const id=el.nodes[j],g=el.geometry[j];if(!g)continue;nodePts.set(id,g);nodeDeg.set(id,(nodeDeg.get(id)||0)+((j===0||j===el.nodes.length-1)?1:2));nodeRank.set(id,Math.max(nodeRank.get(id)||0,rk));}}}
+                if(el.tags&&el.tags.highway){const rk=hwRank(el.tags.highway);const hw=el.tags.highway;
+                  const prio=el.tags.priority_road&&el.tags.priority_road!=='no';
+                  const G=el.geometry,N=el.nodes;
+                  for(let j=0;j<N.length;j++){const id=N[j],g=G[j];if(!g)continue;nodePts.set(id,g);nodeDeg.set(id,(nodeDeg.get(id)||0)+((j===0||j===N.length-1)?1:2));nodeRank.set(id,Math.max(nodeRank.get(id)||0,rk));if(prio)nodePrio.add(id);
+                    let br=nodeBranches.get(id);if(!br){br=[];nodeBranches.set(id,br);}
+                    if(j>0&&G[j-1])br.push({b:bearing(g,G[j-1]),hw});
+                    if(j<N.length-1&&G[j+1])br.push({b:bearing(g,G[j+1]),hw});}}}
             }
           }catch(e){failT++;console.warn('zone',i+1,e.message);}
         }
@@ -1248,10 +1257,16 @@ svg.leaflet-image-layer.leaflet-interactive path {
             if(selSet.has('intersection')) events.intersection.push({lat:it.lat,lon:it.lon,meters:it.meters,detail:'Intersection'+(inCurve?' (en virage)':'')});
             if(inCurve){if(turn>=35){if(selSet.has('turn_curve'))events.turn_curve.push({lat:it.lat,lon:it.lon,meters:it.meters,detail:'Virée '+Math.round(turn)+'°'});}
               else{if(selSet.has('cross_curve'))events.cross_curve.push({lat:it.lat,lon:it.lon,meters:it.meters,detail:'Traversée '+Math.round(turn)+'°'});}}
-            // Priorité à droite : intersection non signalée sur voies mineures, hors rond-point
-            if(pad&&(nodeRank.get(it.id)||1)<=2&&!inRound(it.lat,it.lon)){
+            // Priorité à droite : intersection non signalée, voies mineures, hors rond-point,
+            // hors route prioritaire, ET une route arrive de la DROITE du sens de circulation
+            if(pad&&(nodeRank.get(it.id)||1)<=2&&!inRound(it.lat,it.lon)&&!nodePrio.has(it.id)){
               const ctrl=controls.some(c=>haversine({lat:c.lat,lon:c.lon},{lat:it.lat,lon:it.lon})<=18);
-              if(!ctrl) events.priorite_droite.push({lat:it.lat,lon:it.lon,meters:it.meters,detail:'Céder à droite'});
+              if(!ctrl){
+                const H=headingAt(it.meters,20,geo);
+                const branches=nodeBranches.get(it.id)||[];
+                const fromRight=branches.some(br=>{if(br.hw==='track')return false;const d=angleDiff(H,br.b);return d>25&&d<160;});
+                if(fromRight) events.priorite_droite.push({lat:it.lat,lon:it.lon,meters:it.meters,detail:'Céder à droite'});
+              }
             }}
         }
         // Changements d'attributs (map-matching léger)

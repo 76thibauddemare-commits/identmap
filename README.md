@@ -93,8 +93,13 @@ carte et Overpass).
 **Topologie & régulation** (OpenStreetMap)
 - Ronds-points / giratoires / mini ronds-points, Échangeurs, Bretelles
 - Intersections (toutes) et **intersections en virage** (prise / traversée)
-- **Priorité à droite** : intersections non signalées (sans stop/cédez/feu/
-  rond-point) sur voies mineures, où l'on cède le passage à droite (heuristique OSM)
+- **Priorité à droite** : intersections où l'on cède le passage à droite.
+  Retenue seulement si : une route arrive **de la droite** du sens de circulation,
+  l'intersection n'est **pas signalée** (aucun stop/cédez/feu à ≤18 m), n'est **pas**
+  un rond-point, n'est **pas** sur une route prioritaire (`priority_road`), sur des
+  **voies mineures** (≤ tertiaire), en ignorant les chemins (`track`). Heuristique
+  OSM : la fiabilité du côté droite/gauche baisse sur les intersections en courbe,
+  et une signalisation non cartographiée dans OSM peut donner des faux positifs.
 - Feux tricolores, STOP, Cédez-le-passage, Passages piétons, Passages à niveau
 - Ralentisseurs, Chicanes, Radars, Péages, Barrières / bornes
 - Traversées d'agglomération, Zones scolaires, Arrêts de bus, Gués,
