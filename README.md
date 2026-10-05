@@ -88,7 +88,8 @@ carte et Overpass).
 - **Virages sur autoroute / voie rapide** : bandes dédiées (R<500 m, 500–1000 m,
   >1000 m) car un virage d'autoroute n'a pas le même rayon de courbure qu'en
   ville. Un virage détecté en environnement autoroute est classé dans ces bandes
-  plutôt que dans les bandes « route ».
+  plutôt que dans les bandes « route ». Les **grandes courbes amples** d'autoroute
+  (longues, très progressives) sont désormais détectées (voir « Comment ça marche »).
 - Épingles à cheveux (angle + rayon serré)
 - Successions de virages, Longues lignes droites
 - Virages à rayon décroissant, Enchaînements en S
@@ -140,6 +141,12 @@ carte et Overpass).
 
 - **Géométrie** : tracé ré-échantillonné à pas constant, rotation cumulée par
   segment pour isoler virages, épingles (angle + rayon), successions, lignes droites.
+- **Grandes courbes douces (autoroute)** : un second passage lisse la position
+  (±36 m, pour sortir du bruit GPS) et cumule la rotation de même sens, afin de
+  capter les courbes amples (rayon ~250 m à plusieurs km) qu'un détecteur par
+  segment classe à tort comme « ligne droite ». Ces courbes sont fusionnées aux
+  virages (sans doublonner un virage net déjà détecté) ; sur autoroute/voie
+  rapide elles alimentent les bandes « virages autoroute ».
 - **Altitude** : profil ré-échantillonné (25 m) et lissé, pente sur base 50 m.
 - **OpenStreetMap** : découpage en zones ; une requête [Overpass](https://overpass-api.de/)
   par zone (uniquement les objets cochés) → routes + nœuds. Intersections =

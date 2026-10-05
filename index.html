@@ -839,7 +839,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     curve_500p: {cat:'geom',label:'Virages larges (R>500 m)',color:'#58a6ff',kind:'point',def:false},
     hwcurve_500: {cat:'geom',label:'Virages autoroute serrés (R<500 m)',color:'#f778ba',kind:'point',def:true},
     hwcurve_1000:{cat:'geom',label:'Virages autoroute (R 500-1000 m)',color:'#bc8cff',kind:'point',def:true},
-    hwcurve_1000p:{cat:'geom',label:'Virages autoroute amples (R>1000 m)',color:'#79c0ff',kind:'point',def:false},
+    hwcurve_1000p:{cat:'geom',label:'Virages autoroute amples (R>1000 m)',color:'#79c0ff',kind:'point',def:true},
     hairpin:    {cat:'geom',label:'Épingles à cheveux',color:'#ff5cf0',kind:'point',def:true},
     twisty:     {cat:'geom',label:'Successions de virages',color:'#e3b341',kind:'span',def:true},
     straight:   {cat:'geom',label:'Longues lignes droites',color:'#79c0ff',kind:'span',def:false},
@@ -1016,6 +1016,23 @@ svg.leaflet-image-layer.leaflet-interactive path {
       else if(cur){straight+=STEP;if(straight>=STRAIGHT_GAP)close();}}
     close();return {curves,rcum,res};
   }
+  // Grandes courbes douces (autoroute/voie rapide) : trop progressives pour le détecteur par segment.
+  // On lisse la position (±36 m) pour sortir du bruit GPS, puis on cumule la rotation de même sens.
+  function detectSweeps(res){
+    const n=res.length;if(n<10)return [];
+    const S=3,s=[];for(let i=0;i<n;i++){let la=0,lo=0,c=0;for(let k=Math.max(0,i-S);k<=Math.min(n-1,i+S);k++){la+=res[k].lat;lo+=res[k].lon;c++;}s.push({lat:la/c,lon:lo/c});}
+    const sc=[0];for(let i=1;i<n;i++)sc.push(sc[i-1]+haversine(s[i-1],s[i]));
+    const head=[];for(let i=0;i<n-1;i++)head.push(bearing(s[i],s[i+1]));
+    const out=[];let cur=null,gap=0;const GAPM=80,MIN_DEG=16,PER=0.35,R_MIN=250,R_MAX=6000,L_MIN=250;
+    const close=()=>{if(cur){const len=cur.endM-cur.startM,total=Math.abs(cur.signed),radius=len/Math.max(0.05,total*Math.PI/180);
+      if(total>=MIN_DEG&&radius>=R_MIN&&radius<=R_MAX&&len>=L_MIN){const mi=Math.max(0,Math.min(n-1,cur.midIdx));
+        out.push({startM:cur.startM,endM:cur.endM,lat:res[mi].lat,lon:res[mi].lon,deg:total,radius,rIn:radius,rOut:radius,dir:cur.signed>0?'droite':'gauche'});}cur=null;}};
+    for(let i=1;i<head.length;i++){const d=angleDiff(head[i-1],head[i]),ad=Math.abs(d);
+      if(ad>=PER){if(!cur)cur={startM:sc[i],signed:0,i0:i};
+        if(cur.signed!==0&&Math.sign(d)!==Math.sign(cur.signed)&&ad>=1.0){close();cur={startM:sc[i],signed:0,i0:i};}
+        cur.signed+=d;cur.endM=sc[i+1]!==undefined?sc[i+1]:sc[i];cur.midIdx=Math.floor((cur.i0+i)/2);gap=0;}
+      else if(cur){gap+=(sc[i+1]-sc[i])||12;if(gap>=GAPM)close();}}
+    close();return out;}
   function sev(deg){return deg>=110?'épingle':deg>=75?'serré':deg>=50?'moyen':'léger';}
   function detectTwisty(curves){const GAP=180;const g0=[];let g=null;
     for(const c of curves){if(g&&c.startM-g.endM<=GAP){g.endM=c.endM;g.count++;g.curves.push(c);}else{if(g&&g.count>=3)g0.push(g);g={startM:c.startM,endM:c.endM,count:1,curves:[c]};}}
@@ -1187,6 +1204,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
       els.statDist.textContent=fmtDist(dist.total);
 
       const geo=detectCurves(resample(pts,STEP));
+      const sweeps=detectSweeps(geo.res); // grandes courbes douces (autoroute) manquées par le détecteur par segment
       const index=buildTrackIndex(geo.res,geo.rcum);
       els.statCurves.textContent=geo.curves.length;
 
@@ -1337,9 +1355,13 @@ svg.leaflet-image-layer.leaflet-interactive path {
         window.__failT=failT;
       }
 
+      // Fusion des grandes courbes douces (si elles ne recouvrent pas déjà un virage net détecté)
+      for(const sw of sweeps){if(geo.curves.some(c=>c.startM>=sw.startM-60&&c.startM<=sw.endM+60))continue;geo.curves.push(sw);}
+      geo.curves.sort((a,b)=>a.startM-b.startM);
+
       // --- Émission des bandes de virage (une fois l'environnement connu) ---
       // Sur autoroute/voie rapide, le rayon de référence diffère -> bandes hwcurve dédiées.
-      geo.curves.forEach(c=>{const env=envAt?envAt(c.startM):null;const bt=curveBand(c.radius,env);
+      geo.curves.forEach(c=>{const mm=(c.endM!=null)?(c.startM+c.endM)/2:c.startM;const env=envAt?envAt(mm):null;const bt=curveBand(c.radius,env);
         if(selSet.has(bt))events[bt].push({lat:c.lat,lon:c.lon,meters:c.startM,detail:`${c.dir}, ${Math.round(c.deg)}° · R ~${Math.round(c.radius)} m`,env:env||'rural'});});
 
       // Un rond-point n'est ni un virage ni une intersection : on exclut sa zone
