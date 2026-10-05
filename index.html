@@ -895,6 +895,10 @@ svg.leaflet-image-layer.leaflet-interactive path {
   function curveBand(r,env){
     if(env==='highway')return r<500?'hwcurve_500':r<1000?'hwcurve_1000':'hwcurve_1000p';
     return r<50?'curve_50':r<100?'curve_100':r<300?'curve_300':r<500?'curve_500':'curve_500p';}
+  // Événements ponctuels liés à une voie précise (panneau/feu sur la chaussée) :
+  // on ne les retient que s'ils sont sur une voie RÉELLEMENT empruntée par le véhicule
+  // (nœud appartenant à une voie parcourue) — un stop/feu sur une route adjacente non prise est ignoré.
+  const PATH_GATED=new Set(['traffic_signals','stop','give_way','crossing','traffic_calming','chicane','level_crossing','ford']);
   const ENV_LABEL={highway:'Autoroute / voie rapide',urban:'En ville',rural:'Hors ville'};
   const ENV_ICON={highway:'🛣️',urban:'🏙️',rural:'🌳'};
   const ENV_ORDER=['urban','rural','highway'];
@@ -1207,7 +1211,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
       // --- OSM ---
       const nodeTypes=sel.filter(t=>TYPES[t].node);
       const wantHwCurve=sel.some(t=>HWCURVE_TYPES.includes(t));
-      const needWays=sel.some(t=>TYPES[t].way)||wantHwCurve;
+      const needWays=sel.some(t=>TYPES[t].way)||wantHwCurve||sel.some(t=>PATH_GATED.has(t)); // voies requises pour le map-matching des panneaux/feux
       const needInter=sel.some(t=>TYPES[t].inter);
       const attrWant={maxspeed:selSet.has('speed_limit_change'),lanes:selSet.has('lanes_change'),category:selSet.has('category_change')};
       const needAttr=attrWant.maxspeed||attrWant.lanes||attrWant.category;
@@ -1253,6 +1257,11 @@ svg.leaflet-image-layer.leaflet-interactive path {
         if(buckets.size){envAt=makeEnvAt(buckets);_lastEnvAt=envAt;}
         const maxRun=buildMaxRun(buckets);
         const driven=(id,min)=>(maxRun.get(id)||0)>=(min||40);
+        // Nœuds appartenant à une voie réellement empruntée (pour filtrer les panneaux/feux sur le trajet).
+        // Seuil 60 m : une route transversale qui ne fait qu'effleurer le tracé au carrefour (≈1 tranche)
+        // n'est pas « empruntée » — son stop/feu ne compte pas ; la voie suivie, elle, a une portion continue.
+        const drivenNodeSet=new Set();
+        for(const w of ways){if(w.nodes&&driven(w.id,60))for(const id of w.nodes)drivenNodeSet.add(id);}
 
         // Ronds-points : toujours calculés (sert au dédoublonnage ET de zone d'exclusion)
         const rAll=[];
@@ -1266,8 +1275,8 @@ svg.leaflet-image-layer.leaflet-interactive path {
         if(selSet.has('roundabout')) events.roundabout=rDedup.map(r=>({lat:r.lat,lon:r.lon,meters:r.meters,detail:r.detail}));
         inRound=(lat,lon)=>{for(const r of rDedup){if(haversine({lat,lon},r)<=r.radius+45)return true;}return false;};
         // Événements ponctuels OSM (noeuds) — l'échangeur est traité à part (seulement si emprunté)
-        for(const t of nodeTypes){if(t==='interchange')continue;const test=nodeTest(TYPES[t].node),thr=TYPES[t].thr||24;
-          for(const nd of osmNodes){if(!test(nd.tags||{}))continue;const nr=near(nd);if(nr.dist>thr)continue;const k=t+nd.id;if(seen.has(k))continue;seen.add(k);
+        for(const t of nodeTypes){if(t==='interchange')continue;const test=nodeTest(TYPES[t].node),thr=TYPES[t].thr||24;const gate=PATH_GATED.has(t);
+          for(const nd of osmNodes){if(!test(nd.tags||{}))continue;if(gate&&!drivenNodeSet.has(nd.id))continue;const nr=near(nd);if(nr.dist>thr)continue;const k=t+nd.id;if(seen.has(k))continue;seen.add(k);
             events[t].push({lat:nd.lat,lon:nd.lon,meters:nr.meters,detail:(nd.tags&&(nd.tags.ref||nd.tags.name))||''});}}
         // Bretelles / tunnels / ponts / dégradé / étroit (ways span)
         // emit()        : simple proximité au tracé (attribut de la route longée)
@@ -1455,6 +1464,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   function restoreState(s){
     curName=s.name||'';curPts=s.pts;hasEle=!!s.hasEle;curDist=buildDistances(curPts);setProjection();
     events={};for(const t of ORDER)events[t]=(s.events&&s.events[t])?s.events[t]:[];
+    try{window.__events=events;}catch(e){}
     priorities=(events.priority||[]).slice();
     for(const t of ORDER){selected[t]=!!(s.selected&&s.selected[t]);enabled[t]=!!(s.enabled&&s.enabled[t]);}
     selected.priority=true;

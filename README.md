@@ -112,8 +112,12 @@ carte et Overpass).
   **voies mineures** (≤ tertiaire), en ignorant les chemins (`track`). Heuristique
   OSM : la fiabilité du côté droite/gauche baisse sur les intersections en courbe,
   et une signalisation non cartographiée dans OSM peut donner des faux positifs.
-- Feux tricolores, STOP, Cédez-le-passage, Passages piétons, Passages à niveau
-- Ralentisseurs, Chicanes, Radars, Péages, Barrières / bornes
+- Feux tricolores, STOP, Cédez-le-passage, Passages piétons, Passages à niveau,
+  Ralentisseurs, Chicanes, Gués : **seulement s'ils sont sur la voie réellement
+  empruntée** (map-matching). Un stop / feu / cédez posé sur une route adjacente
+  (ou sur la branche d'un carrefour que le véhicule ne prend pas) est ignoré.
+- Radars, Péages, Barrières / bornes, Arrêts de bus (filtrés par simple proximité
+  au tracé — souvent cartographiés comme points isolés en bord de voie)
 - Traversées d'agglomération, Zones scolaires, Arrêts de bus, Gués,
   Créneaux de dépassement
 
