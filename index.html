@@ -721,6 +721,12 @@ svg.leaflet-image-layer.leaflet-interactive path {
   .envseg button{flex:1;background:var(--panel-2);color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:8px 6px;font-size:13px;font-weight:600;cursor:pointer;}
   .envseg button.on{background:var(--accent);color:#fff;border-color:var(--accent);}
   .envseg button:disabled{opacity:.4;cursor:not-allowed;}
+  .envkm{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:0 16px 8px;}
+  .envkm .km-tile{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:7px 8px;text-align:center;}
+  .envkm .km-tile .v{font-size:15px;font-weight:700;line-height:1.15;}
+  .envkm .km-tile .l{font-size:10.5px;color:var(--muted);margin-top:2px;}
+  tbody tr.grp{cursor:default;background:#161d26;}
+  tbody tr.grp td{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;padding:7px 12px;border-bottom:1px solid var(--border);}
   .prio-bar{display:flex;align-items:center;gap:10px;padding:8px 16px 0;}
   .prio-bar button{background:#ffd24a;color:#20242c;border:none;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;}
   .prio-bar button.on{background:#ff6b35;color:#fff;}
@@ -790,7 +796,9 @@ svg.leaflet-image-layer.leaflet-interactive path {
           <button data-env="all" class="on">Tout</button>
           <button data-env="urban">En ville</button>
           <button data-env="rural">Hors ville</button>
+          <button data-env="highway">Autoroute</button>
         </div>
+        <div class="envkm" id="envKm" hidden></div>
         <div class="prio-bar"><button id="prioBtn">📍 Ajouter un repère</button><span class="note" id="prioHint"></span></div>
         <div class="panel-head"><span>Afficher sur la carte</span></div>
         <div class="layers"><div id="layerList"></div></div>
@@ -829,6 +837,9 @@ svg.leaflet-image-layer.leaflet-interactive path {
     curve_300:  {cat:'geom',label:'Virages (R 100-300 m)',color:'#e3b341',kind:'point',def:true},
     curve_500:  {cat:'geom',label:'Virages (R 300-500 m)',color:'#7ee787',kind:'point',def:true},
     curve_500p: {cat:'geom',label:'Virages larges (R>500 m)',color:'#58a6ff',kind:'point',def:false},
+    hwcurve_500: {cat:'geom',label:'Virages autoroute serrés (R<500 m)',color:'#f778ba',kind:'point',def:true},
+    hwcurve_1000:{cat:'geom',label:'Virages autoroute (R 500-1000 m)',color:'#bc8cff',kind:'point',def:true},
+    hwcurve_1000p:{cat:'geom',label:'Virages autoroute amples (R>1000 m)',color:'#79c0ff',kind:'point',def:false},
     hairpin:    {cat:'geom',label:'Épingles à cheveux',color:'#ff5cf0',kind:'point',def:true},
     twisty:     {cat:'geom',label:'Successions de virages',color:'#e3b341',kind:'span',def:true},
     straight:   {cat:'geom',label:'Longues lignes droites',color:'#79c0ff',kind:'span',def:false},
@@ -878,14 +889,21 @@ svg.leaflet-image-layer.leaflet-interactive path {
   };
   const ORDER=Object.keys(TYPES);
   const CURVE_TYPES=['curve_50','curve_100','curve_300','curve_500','curve_500p'];
-  const VIRAGE_FAMILY=[...CURVE_TYPES,'hairpin','decreasing_radius','s_curve'];
-  function curveBand(r){return r<50?'curve_50':r<100?'curve_100':r<300?'curve_300':r<500?'curve_500':'curve_500p';}
+  const HWCURVE_TYPES=['hwcurve_500','hwcurve_1000','hwcurve_1000p'];
+  const VIRAGE_FAMILY=[...CURVE_TYPES,...HWCURVE_TYPES,'hairpin','decreasing_radius','s_curve'];
+  // Les virages sur autoroute/voie rapide n'ont pas les mêmes rayons : bandes dédiées (plus larges)
+  function curveBand(r,env){
+    if(env==='highway')return r<500?'hwcurve_500':r<1000?'hwcurve_1000':'hwcurve_1000p';
+    return r<50?'curve_50':r<100?'curve_100':r<300?'curve_300':r<500?'curve_500':'curve_500p';}
+  const ENV_LABEL={highway:'Autoroute / voie rapide',urban:'En ville',rural:'Hors ville'};
+  const ENV_ICON={highway:'🛣️',urban:'🏙️',rural:'🌳'};
+  const ENV_ORDER=['urban','rural','highway'];
 
   // ================= État =================
   let map=null,trackLayer=null;
   const layerGroups={},enabled={},selected={};
   let events={},curPts=null,curDist=null,hasEle=false,curName='';
-  let envFilter='all',hasEnv=false;
+  let envFilter='all',hasEnv=false,curEnvKm=null;
   let priorities=[],addMode=false,curTrackIndex=null;
 
   // ====== Firebase (optionnel : partage des vues entre appareils) ======
@@ -1071,7 +1089,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 
   // ================= Rendu =================
   function fmtDist(m){return m>=1000?(m/1000).toFixed(m>=10000?0:1)+' km':Math.round(m)+' m';}
-  function matchEnv(ev){return envFilter==='all'?true:envFilter==='urban'?ev.urban===true:ev.urban!==true;}
+  function matchEnv(ev){if(envFilter==='all')return true;return (ev.env||'rural')===envFilter;}
   // ----- Priorités (points posés manuellement) -----
   function setProjection(){if(!curPts||curPts.length<2){curTrackIndex=null;return;}
     const res=resample(curPts,STEP);const rcum=[0];for(let i=1;i<res.length;i++)rcum.push(rcum[i-1]+haversine(res[i-1],res[i]));
@@ -1079,7 +1097,9 @@ svg.leaflet-image-layer.leaflet-interactive path {
   function nearestKm(lat,lon){if(!curTrackIndex)return {dist:0,meters:0};return curTrackIndex.query(lat,lon);}
   function refreshPriorities(){events.priority=priorities.slice();selected.priority=true;enabled.priority=priorities.length>0;if(map){drawEvents();applyVis();}renderLayerList();renderTable();}
   function addPriority(latlng){const nr=nearestKm(latlng.lat,latlng.lng);const def='Repère '+(priorities.length+1);const note=window.prompt('Nom du repère (optionnel) :',def);if(note===null)return;
-    priorities.push({id:'p'+Date.now().toString(36)+Math.floor(Math.random()*1000),lat:latlng.lat,lon:latlng.lng,meters:nr.meters,detail:note||def,badge:'★',urban:null});refreshPriorities();}
+    priorities.push({id:'p'+Date.now().toString(36)+Math.floor(Math.random()*1000),lat:latlng.lat,lon:latlng.lng,meters:nr.meters,detail:note||def,badge:'★',env:curEnvKm?(makeEnvQuery()(nr.meters)||'rural'):null});refreshPriorities();}
+  // envAt rapide basé sur le dernier contexte (pour repères posés après analyse) — fallback null
+  let _lastEnvAt=null;function makeEnvQuery(){return _lastEnvAt||(()=>null);}
   function removePriority(id){priorities=priorities.filter(p=>p.id!==id);refreshPriorities();}
   function evIcon(t,txt){return L.divIcon({className:'',html:`<div class="ev-marker" style="background:${TYPES[t].color}">${txt||''}</div>`,iconSize:[22,22],iconAnchor:[11,11]});}
   function drawEvents(){if(!map)return;for(const t of ORDER){const lg=layerGroups[t];if(!lg)continue;lg.clearLayers();
@@ -1106,17 +1126,28 @@ svg.leaflet-image-layer.leaflet-interactive path {
       row.querySelector('input').addEventListener('change',e=>{enabled[t]=e.target.checked;applyVis();renderLayerList();renderTable();});
       els.layerList.appendChild(row);}
     if(!any)els.layerList.innerHTML='<div class="note" style="padding:8px">Aucun type sélectionné.</div>';}
-  function renderEnv(){const seg=$('envSeg');if(!seg)return;[...seg.querySelectorAll('button')].forEach(b=>{b.classList.toggle('on',b.dataset.env===envFilter);if(b.dataset.env!=='all')b.disabled=!hasEnv;});$('envNote').textContent=hasEnv?'':'(coche un type OSM pour l\'activer)';}
+  function renderEnv(){const seg=$('envSeg');if(!seg)return;[...seg.querySelectorAll('button')].forEach(b=>{b.classList.toggle('on',b.dataset.env===envFilter);if(b.dataset.env!=='all')b.disabled=!hasEnv;});$('envNote').textContent=hasEnv?'':'(coche un type OSM pour l\'activer)';
+    const box=$('envKm');if(box){if(curEnvKm){box.hidden=false;box.innerHTML=ENV_ORDER.map(e=>`<div class="km-tile"><div class="v">${fmtDist(curEnvKm[e]||0)}</div><div class="l">${ENV_ICON[e]} ${ENV_LABEL[e]}</div></div>`).join('');}else{box.hidden=true;box.innerHTML='';}}}
+  function tableRow(t,ev){const tr=document.createElement('tr');
+    const del=t==='priority'?`<span class="delp" data-id="${ev.id}" title="Supprimer">✕</span>`:'';
+    tr.innerHTML=`<td><span class="ev-dot" style="background:${TYPES[t].color}"></span><span class="ev-type">${TYPES[t].label}</span></td><td class="km">${(ev.meters/1000).toFixed(2)}</td><td class="ev-type">${ev.detail||''}${del}</td>`;
+    tr.addEventListener('click',()=>{if(map){map.setView([ev.lat,ev.lon],16,{animate:true});if(ev._m)ev._m.openPopup();}});
+    if(t==='priority'){const d=tr.querySelector('.delp');if(d)d.addEventListener('click',e2=>{e2.stopPropagation();removePriority(ev.id);});}
+    return tr;}
+  function groupHeader(label,n){const tr=document.createElement('tr');tr.className='grp';
+    tr.innerHTML=`<td colspan="3">${label} · ${n}</td>`;return tr;}
   function renderTable(){const rows=[];for(const t of ORDER){if(!enabled[t])continue;for(const ev of (events[t]||[]))if(matchEnv(ev))rows.push({t,ev});}
     rows.sort((a,b)=>a.ev.meters-b.ev.meters);els.tableBody.innerHTML='';
     if(!rows.length){els.tableBox.style.display='none';els.emptyState.style.display='block';els.emptyState.innerHTML='Aucun événement à afficher.<br>Coche un type ci-dessus.';return;}
     els.emptyState.style.display='none';els.tableBox.style.display='table';
-    for(const {t,ev} of rows){const tr=document.createElement('tr');
-      const del=t==='priority'?`<span class="delp" data-id="${ev.id}" title="Supprimer">✕</span>`:'';
-      tr.innerHTML=`<td><span class="ev-dot" style="background:${TYPES[t].color}"></span><span class="ev-type">${TYPES[t].label}</span></td><td class="km">${(ev.meters/1000).toFixed(2)}</td><td class="ev-type">${ev.detail||''}${del}</td>`;
-      tr.addEventListener('click',()=>{if(map){map.setView([ev.lat,ev.lon],16,{animate:true});if(ev._m)ev._m.openPopup();}});
-      if(t==='priority'){const d=tr.querySelector('.delp');if(d)d.addEventListener('click',e2=>{e2.stopPropagation();removePriority(ev.id);});}
-      els.tableBody.appendChild(tr);}}
+    // Regroupement par environnement quand aucun filtre n'est actif (et environnement connu)
+    if(envFilter==='all'&&hasEnv){
+      for(const e of ENV_ORDER){const grp=rows.filter(r=>(r.ev.env||'rural')===e);if(!grp.length)continue;
+        els.tableBody.appendChild(groupHeader(ENV_ICON[e]+' '+ENV_LABEL[e],grp.length));
+        for(const {t,ev} of grp)els.tableBody.appendChild(tableRow(t,ev));}
+      return;
+    }
+    for(const {t,ev} of rows)els.tableBody.appendChild(tableRow(t,ev));}
 
   // ================= Panneau de configuration =================
   function buildConfig(){els.cfgList.innerHTML='';
@@ -1157,8 +1188,8 @@ svg.leaflet-image-layer.leaflet-interactive path {
 
       events={};for(const t of ORDER)events[t]=[];
 
-      // --- Géométrie ---
-      geo.curves.forEach(c=>{const bt=curveBand(c.radius);if(selSet.has(bt))events[bt].push({lat:c.lat,lon:c.lon,meters:c.startM,detail:`${c.dir}, ${Math.round(c.deg)}° · R ~${Math.round(c.radius)} m`});});
+      // --- Géométrie --- (les bandes de virage sont émises plus bas, une fois l'environnement connu :
+      // un virage sur autoroute n'a pas le même rayon qu'en ville → bandes dédiées)
       if(selSet.has('hairpin')) geo.curves.filter(c=>c.deg>=100&&c.radius<=35).forEach(c=>events.hairpin.push({lat:c.lat,lon:c.lon,meters:c.startM,detail:`${c.dir}, ${Math.round(c.deg)}° · rayon ~${Math.round(c.radius)} m`}));
       if(selSet.has('twisty')) detectTwisty(geo.curves).forEach(g=>events.twisty.push({lat:g.lat,lon:g.lon,meters:g.startM,detail:`${g.count} virages sur ${fmtDist(g.endM-g.startM)}`,path:spanPath(geo,g.startM,g.endM)}));
       if(selSet.has('straight')) detectStraight(geo.curves,dist.total,geo).forEach(s=>events.straight.push({lat:s.lat,lon:s.lon,meters:s.startM,detail:`ligne droite ${fmtDist(s.len)}`,path:spanPath(geo,s.startM,s.endM)}));
@@ -1175,11 +1206,16 @@ svg.leaflet-image-layer.leaflet-interactive path {
 
       // --- OSM ---
       const nodeTypes=sel.filter(t=>TYPES[t].node);
-      const needWays=sel.some(t=>TYPES[t].way);
+      const wantHwCurve=sel.some(t=>HWCURVE_TYPES.includes(t));
+      const needWays=sel.some(t=>TYPES[t].way)||wantHwCurve;
       const needInter=sel.some(t=>TYPES[t].inter);
       const attrWant={maxspeed:selSet.has('speed_limit_change'),lanes:selSet.has('lanes_change'),category:selSet.has('category_change')};
       const needAttr=attrWant.maxspeed||attrWant.lanes||attrWant.category;
       const needMini=selSet.has('roundabout');
+
+      // Partagés entre le bloc OSM et la suite (émission des virages, exclusions, environnement)
+      let envAt=null,inRound=()=>false;
+      _lastEnvAt=null;curEnvKm=null;
 
       if(nodeTypes.length||needWays){
         setStatus('<span class="spinner"></span>Analyse OpenStreetMap…');
@@ -1214,7 +1250,9 @@ svg.leaflet-image-layer.leaflet-interactive path {
         const near=g=>index.query(g.lat,g.lon);
         const seen=new Set();
         const buckets=ways.length?buildBuckets(ways,index):new Map();
-        const urbanAt=makeUrbanAt(buckets);
+        if(buckets.size){envAt=makeEnvAt(buckets);_lastEnvAt=envAt;}
+        const maxRun=buildMaxRun(buckets);
+        const driven=(id,min)=>(maxRun.get(id)||0)>=(min||40);
 
         // Ronds-points : toujours calculés (sert au dédoublonnage ET de zone d'exclusion)
         const rAll=[];
@@ -1226,17 +1264,21 @@ svg.leaflet-image-layer.leaflet-interactive path {
         for(const r of rAll){let dup=false;for(const d of rDedup){if(haversine(r,d)<=Math.max(45,d.radius+r.radius+10)){dup=true;break;}}if(!dup)rDedup.push(r);}
         rDedup.sort((a,b)=>a.meters-b.meters);
         if(selSet.has('roundabout')) events.roundabout=rDedup.map(r=>({lat:r.lat,lon:r.lon,meters:r.meters,detail:r.detail}));
-        const inRound=(lat,lon)=>{for(const r of rDedup){if(haversine({lat,lon},r)<=r.radius+45)return true;}return false;};
-        // Événements ponctuels OSM (noeuds)
-        for(const t of nodeTypes){const test=nodeTest(TYPES[t].node),thr=TYPES[t].thr||24;
+        inRound=(lat,lon)=>{for(const r of rDedup){if(haversine({lat,lon},r)<=r.radius+45)return true;}return false;};
+        // Événements ponctuels OSM (noeuds) — l'échangeur est traité à part (seulement si emprunté)
+        for(const t of nodeTypes){if(t==='interchange')continue;const test=nodeTest(TYPES[t].node),thr=TYPES[t].thr||24;
           for(const nd of osmNodes){if(!test(nd.tags||{}))continue;const nr=near(nd);if(nr.dist>thr)continue;const k=t+nd.id;if(seen.has(k))continue;seen.add(k);
             events[t].push({lat:nd.lat,lon:nd.lon,meters:nr.meters,detail:(nd.tags&&(nd.tags.ref||nd.tags.name))||''});}}
         // Bretelles / tunnels / ponts / dégradé / étroit (ways span)
+        // emit()        : simple proximité au tracé (attribut de la route longée)
+        // emitDriven()  : seulement si la voie est RÉELLEMENT empruntée (map-matching) —
+        //                 une bretelle/un pont/un tunnel collé au parcours mais non pris est ignoré.
         for(const w of ways){const tg=w.tags||{};
           const emit=(t,detail)=>{const run=onTrackRun(w.geometry,near,22);if(run){const mid=run.path[Math.floor(run.path.length/2)];events[t].push({lat:mid.lat,lon:mid.lon,meters:run.startM,detail,path:run.path});}};
-          if(selSet.has('ramp')&&/_link$/.test(tg.highway||'')) emit('ramp','Bretelle');
-          if(selSet.has('tunnel')&&tg.tunnel&&tg.tunnel!=='no') emit('tunnel','Tunnel'+(tg.name?' '+tg.name:''));
-          if(selSet.has('bridge')&&tg.bridge&&tg.bridge!=='no') emit('bridge','Pont'+(tg.name?' '+tg.name:''));
+          const emitDriven=(t,detail,min)=>{if(driven(w.id,min))emit(t,detail);};
+          if(selSet.has('ramp')&&/_link$/.test(tg.highway||'')) emitDriven('ramp','Bretelle',70);
+          if(selSet.has('tunnel')&&tg.tunnel&&tg.tunnel!=='no') emitDriven('tunnel','Tunnel'+(tg.name?' '+tg.name:''),40);
+          if(selSet.has('bridge')&&tg.bridge&&tg.bridge!=='no') emitDriven('bridge','Pont'+(tg.name?' '+tg.name:''),40);
           if(selSet.has('bad_road')&&(tg.lane_markings==='no'||(tg.surface&&BAD_SURF.has(tg.surface))||tg.highway==='track')) emit('bad_road',(tg.lane_markings==='no'?'Sans marquage ':'')+(tg.surface||'dégradée'));
           if(selSet.has('narrow')&&((tg.width&&parseFloat(tg.width)<=3.2)||(tg.lanes==='1'&&tg.oneway!=='yes'&&/^(unclassified|residential|tertiary|road)$/.test(tg.highway||'')))) emit('narrow','Route étroite'+(tg.width?' '+tg.width+' m':''));
           if(selSet.has('construction')&&(tg.highway==='construction'||tg.construction)) emit('construction','Travaux'+(tg.construction?' ('+tg.construction+')':''));
@@ -1244,6 +1286,15 @@ svg.leaflet-image-layer.leaflet-interactive path {
           if(selSet.has('unlit')&&tg.lit==='no') emit('unlit','Non éclairé');
           if(selSet.has('incline')&&tg.incline) emit('incline','Incline '+tg.incline);
           if(selSet.has('zone30')){const ms=parseInt(tg.maxspeed,10);if(isFinite(ms)&&ms<=30) emit('zone30','Limite '+tg.maxspeed+' km/h');}
+        }
+        // Échangeurs réellement empruntés : nœud motorway_junction proche du tracé AVEC une bretelle (_link) prise à côté
+        if(selSet.has('interchange')){
+          const drivenLinks=ways.filter(w=>/_link$/.test((w.tags&&w.tags.highway)||'')&&driven(w.id,70));
+          for(const nd of osmNodes){if(!(nd.tags&&nd.tags.highway==='motorway_junction'))continue;
+            const nr=near(nd);if(nr.dist>(TYPES.interchange.thr||90))continue;
+            if(!drivenLinks.some(w=>w.geometry.some(g=>haversine(g,nd)<=70)))continue; // bretelle non prise -> on ne compte pas
+            const k='interchange'+nd.id;if(seen.has(k))continue;seen.add(k);
+            events.interchange.push({lat:nd.lat,lon:nd.lon,meters:nr.meters,detail:'Échangeur'+(nd.tags.ref?' '+nd.tags.ref:(nd.tags.name?' '+nd.tags.name:''))});}
         }
         // Zones scolaires (surfaces amenity=school)
         if(selSet.has('school')){for(const w of ways){if(w.tags&&w.tags.amenity==='school'&&w.geometry){const c=centroid(w.geometry);let best={dist:Infinity,meters:0};for(const g of w.geometry){const q=near(g);if(q.dist<best.dist)best=q;}const cc=near(c);if(cc.dist<best.dist)best=cc;
@@ -1274,13 +1325,23 @@ svg.leaflet-image-layer.leaflet-interactive path {
           if(attrWant.maxspeed)events.speed_limit_change=ch.maxspeed;
           if(attrWant.lanes)events.lanes_change=ch.lanes;
           if(attrWant.category)events.category_change=ch.category;}
-        // Un rond-point n'est ni un virage ni une intersection : on exclut sa zone
-        const EXCL=[...CURVE_TYPES,'hairpin','decreasing_radius','s_curve','crest_curve','intersection','turn_curve','cross_curve'];
-        for(const t of EXCL) if(events[t]&&events[t].length) events[t]=events[t].filter(ev=>!inRound(ev.lat,ev.lon));
-        els.statCurves.textContent=geo.curves.filter(c=>!inRound(c.lat,c.lon)).length;
-        // Environnement (ville / hors ville) par événement
-        if(ways.length){for(const t of ORDER)for(const ev of (events[t]||[]))ev.urban=urbanAt(ev.meters);hasEnv=true;}
         window.__failT=failT;
+      }
+
+      // --- Émission des bandes de virage (une fois l'environnement connu) ---
+      // Sur autoroute/voie rapide, le rayon de référence diffère -> bandes hwcurve dédiées.
+      geo.curves.forEach(c=>{const env=envAt?envAt(c.startM):null;const bt=curveBand(c.radius,env);
+        if(selSet.has(bt))events[bt].push({lat:c.lat,lon:c.lon,meters:c.startM,detail:`${c.dir}, ${Math.round(c.deg)}° · R ~${Math.round(c.radius)} m`,env:env||'rural'});});
+
+      // Un rond-point n'est ni un virage ni une intersection : on exclut sa zone
+      const EXCL=[...CURVE_TYPES,...HWCURVE_TYPES,'hairpin','decreasing_radius','s_curve','crest_curve','intersection','turn_curve','cross_curve'];
+      for(const t of EXCL) if(events[t]&&events[t].length) events[t]=events[t].filter(ev=>!inRound(ev.lat,ev.lon));
+      els.statCurves.textContent=geo.curves.filter(c=>!inRound(c.lat,c.lon)).length;
+
+      // Environnement par événement + répartition kilométrique du parcours
+      if(envAt){
+        for(const t of ORDER)for(const ev of (events[t]||[]))if(ev.env==null)ev.env=envAt(ev.meters)||'rural';
+        curEnvKm=computeEnvKm(envAt,dist.total);hasEnv=true;
       }
 
       events.priority=priorities.slice(); // priorités posées manuellement (préservées entre analyses)
@@ -1302,15 +1363,27 @@ svg.leaflet-image-layer.leaflet-interactive path {
     if(start>=0&&segLen(path)>=40&&!best)best={startM:near(path[0]).meters,path:path.slice()};return best;}
   // Contexte routier échantillonné le long du tracé (voie la plus proche par tranche de 40 m)
   function buildBuckets(ways,index){const B=40,buckets=new Map();
-    for(const w of ways){const tg=w.tags||{};if(!tg.highway)continue;for(const g of w.geometry){const q=index.query(g.lat,g.lon);if(q.dist>18)continue;const bi=Math.round(q.meters/B),ex=buckets.get(bi);if(!ex||q.dist<ex.dist)buckets.set(bi,{dist:q.dist,meters:q.meters,tags:tg,lat:g.lat,lon:g.lon});}}
+    for(const w of ways){const tg=w.tags||{};if(!tg.highway)continue;for(const g of w.geometry){const q=index.query(g.lat,g.lon);if(q.dist>18)continue;const bi=Math.round(q.meters/B),ex=buckets.get(bi);if(!ex||q.dist<ex.dist)buckets.set(bi,{dist:q.dist,meters:q.meters,tags:tg,id:w.id,lat:g.lat,lon:g.lon});}}
     return buckets;}
-  function isUrbanTags(tg){const ms=parseInt(tg.maxspeed,10);
-    if(/^(residential|living_street|pedestrian|service)$/.test(tg.highway||''))return true;
-    if(isFinite(ms)){if(ms<=50)return true;if(ms>=70)return false;}
-    if(tg.lit==='yes')return true;
-    if(/^(motorway|trunk)$/.test(tg.highway||''))return false;
-    return false;} // par défaut : hors ville
-  function makeUrbanAt(buckets){return m=>{const bi=Math.round(m/40);for(let d=0;d<=4;d++){for(const s of (d===0?[bi]:[bi-d,bi+d])){const b=buckets.get(s);if(b)return isUrbanTags(b.tags);}}return null;};}
+  // Environnement routier d'après les tags OSM : autoroute/voie rapide, en ville, hors ville
+  function envClass(tg){const hw=(tg.highway||'');
+    if(/^(motorway|trunk)(_link)?$/.test(hw)||tg.motorroad==='yes')return 'highway';
+    const ms=parseInt(tg.maxspeed,10);
+    if(/^(residential|living_street|pedestrian|service)$/.test(hw))return 'urban';
+    if(isFinite(ms)){if(ms<=50)return 'urban';if(ms>=70)return 'rural';}
+    if(tg.lit==='yes')return 'urban';
+    return 'rural';}
+  function makeEnvAt(buckets){return m=>{const bi=Math.round(m/40);for(let d=0;d<=4;d++){for(const s of (d===0?[bi]:[bi-d,bi+d])){const b=buckets.get(s);if(b)return envClass(b.tags);}}return null;};}
+  // Km parcourus par environnement (pas de 40 m le long du tracé ; défaut hors ville si OSM muet)
+  function computeEnvKm(envAt,totalM){const B=40,km={highway:0,urban:0,rural:0};
+    for(let m=0;m<totalM;m+=B){const e=envAt(m)||'rural';const len=Math.min(B,totalM-m);km[e]+=len;}return km;}
+  // Map-matching : plus longue portion CONSÉCUTIVE (tolérance 1 trou) où chaque voie OSM est la plus proche du tracé.
+  // Sert à savoir si une bretelle/un pont/un tunnel est RÉELLEMENT emprunté (et non simplement collé au parcours).
+  function buildMaxRun(buckets){const B=40,keys=[...buckets.keys()].sort((a,b)=>a-b),maxRun=new Map();
+    let i=0;while(i<keys.length){const id=buckets.get(keys[i]).id;let j=i;
+      while(j+1<keys.length&&buckets.get(keys[j+1]).id===id&&keys[j+1]-keys[j]<=2)j++;
+      const len=(keys[j]-keys[i]+1)*B;if(len>(maxRun.get(id)||0))maxRun.set(id,len);i=j+1;}
+    return maxRun;}
   function attrChanges(buckets,want){
     const keys=[...buckets.keys()].sort((a,b)=>a-b);const out={maxspeed:[],lanes:[],category:[]};let prev=null;
     for(const k of keys){const b=buckets.get(k);const tg=b.tags;
@@ -1374,9 +1447,9 @@ svg.leaflet-image-layer.leaflet-interactive path {
   // ===== Enregistrer / restaurer une vue (localStorage + lien #v=id) =====
   function serializeState(){
     const clean={};
-    for(const t of ORDER){clean[t]=(events[t]||[]).map(ev=>{const o={lat:ev.lat,lon:ev.lon,meters:ev.meters};if(ev.detail)o.detail=ev.detail;if(ev.badge)o.badge=ev.badge;if(ev.path)o.path=ev.path;if('urban'in ev)o.urban=ev.urban;return o;});}
+    for(const t of ORDER){clean[t]=(events[t]||[]).map(ev=>{const o={lat:ev.lat,lon:ev.lon,meters:ev.meters};if(ev.detail)o.detail=ev.detail;if(ev.badge)o.badge=ev.badge;if(ev.path)o.path=ev.path;if(ev.env!=null)o.env=ev.env;return o;});}
     const mv=map?{c:[map.getCenter().lat,map.getCenter().lng],z:map.getZoom()}:null;
-    return {v:1,name:curName,hasEle,pts:curPts,events:clean,enabled:{...enabled},selected:{...selected},envFilter,hasEnv,
+    return {v:1,name:curName,hasEle,pts:curPts,events:clean,enabled:{...enabled},selected:{...selected},envFilter,hasEnv,envKm:curEnvKm,
       stat:{dist:els.statDist.textContent,curves:els.statCurves.textContent,extra:els.statExtra.textContent,extraLbl:els.statExtraLbl.textContent},mv};
   }
   function restoreState(s){
@@ -1385,7 +1458,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     priorities=(events.priority||[]).slice();
     for(const t of ORDER){selected[t]=!!(s.selected&&s.selected[t]);enabled[t]=!!(s.enabled&&s.enabled[t]);}
     selected.priority=true;
-    envFilter=s.envFilter||'all';hasEnv=!!s.hasEnv;
+    envFilter=s.envFilter||'all';hasEnv=!!s.hasEnv;curEnvKm=s.envKm||null;_lastEnvAt=null;
     els.fileHint.textContent=curName||'(vue enregistrée)';
     buildConfig(); // pour que « Modifier la sélection » reste utilisable
     if(map){if(trackLayer)map.removeLayer(trackLayer);trackLayer=L.polyline(curPts.map(p=>[p.lat,p.lon]),{color:'#ff6b35',weight:3,opacity:.85}).addTo(map);}

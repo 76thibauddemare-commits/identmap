@@ -14,8 +14,11 @@ une carte interactive avec un **tableau de synthèse trié par kilomètre**.
 3. **Lancer l'analyse** (zone par zone, avec progression).
 4. **Onglet Résultats** : cases à cocher pour afficher chaque type sur la carte,
    compteurs, et tableau (clic = recentrage).
-5. **Filtre environnement** : *Tout / En ville / Hors ville* — n'affiche que les
-   événements en agglomération ou hors agglomération (carte + tableau + compteurs).
+5. **Filtre environnement** : *Tout / En ville / Hors ville / Autoroute* — n'affiche
+   que les événements de l'environnement choisi (carte + tableau + compteurs). Sous
+   *Tout*, le tableau est **regroupé par environnement**. Trois tuiles donnent la
+   **répartition kilométrique** du parcours : km **en ville / hors ville / sur
+   autoroute (ou voie rapide)**.
 6. **Bouton Google Maps** : ouvre le parcours en navigation dans Google Maps
    (app sur mobile). L'URL est limitée par Google à ~9 étapes : le tracé est
    envoyé sous forme de départ + arrivée + ~8 points intermédiaires répartis,
@@ -82,6 +85,10 @@ carte et Overpass).
 - Virages par **rayon de courbure estimé** : R<50 m, 50–100 m, 100–300 m,
   300–500 m, >500 m (chaque bande est une couche séparée ; le rayon est affiché
   dans le détail). Le « nombre de virages » = somme des bandes.
+- **Virages sur autoroute / voie rapide** : bandes dédiées (R<500 m, 500–1000 m,
+  >1000 m) car un virage d'autoroute n'a pas le même rayon de courbure qu'en
+  ville. Un virage détecté en environnement autoroute est classé dans ces bandes
+  plutôt que dans les bandes « route ».
 - Épingles à cheveux (angle + rayon serré)
 - Successions de virages, Longues lignes droites
 - Virages à rayon décroissant, Enchaînements en S
@@ -91,7 +98,12 @@ carte et Overpass).
 - Longues descentes continues, Dénivelé +
 
 **Topologie & régulation** (OpenStreetMap)
-- Ronds-points / giratoires / mini ronds-points, Échangeurs, Bretelles
+- Ronds-points / giratoires / mini ronds-points
+- **Échangeurs et bretelles réellement empruntés** : seuls les échangeurs dont une
+  bretelle est effectivement prise par le véhicule, et les bretelles effectivement
+  suivies, sont comptés (map-matching) — une bretelle simplement collée au parcours
+  mais non prise est ignorée. Idem pour les **tunnels** et **ponts** (seuls ceux
+  traversés sont retenus).
 - Intersections (toutes) et **intersections en virage** (prise / traversée)
 - **Priorité à droite** : intersections où l'on cède le passage à droite.
   Retenue seulement si : une route arrive **de la droite** du sens de circulation,
@@ -129,10 +141,18 @@ carte et Overpass).
   par zone (uniquement les objets cochés) → routes + nœuds. Intersections =
   nœuds de degré ≥ 3. Filtrage par proximité au tracé via un index spatial.
 - **Changements d'attributs** : appariement léger des tronçons OSM au tracé.
-- **Environnement (ville / hors ville)** : chaque événement est classé d'après le
-  contexte routier OSM à sa position — *en ville* si vitesse ≤ 50, voie
-  résidentielle/zone de rencontre, ou éclairage public ; *hors ville* sinon.
-  Heuristique dépendant de la complétude d'OSM (maxspeed, lit…).
+- **Environnement (ville / hors ville / autoroute)** : chaque événement est classé
+  d'après le contexte routier OSM à sa position — *autoroute/voie rapide* si
+  `motorway`/`trunk` (ou `motorroad`) ; *en ville* si vitesse ≤ 50, voie
+  résidentielle/zone de rencontre, ou éclairage public ; *hors ville* sinon. La
+  **répartition kilométrique** parcourt le tracé par tranches de 40 m et somme la
+  longueur de chaque classe. Heuristique dépendant de la complétude d'OSM
+  (maxspeed, lit…).
+- **Voies réellement empruntées (map-matching)** : pour chaque tranche de 40 m du
+  tracé, on retient la voie OSM la plus proche. Une bretelle/un pont/un tunnel
+  n'est compté que s'il est la voie la plus proche sur une portion continue
+  suffisante (il est donc *pris*, pas seulement longé). Un échangeur n'est compté
+  que si une bretelle est effectivement prise à proximité.
 - **Ronds-points** : dédoublonnés géographiquement (un rond-point cartographié en
   plusieurs tronçons OSM, ou repassé, n'apparaît qu'une fois) ; leur zone est
   exclue des virages, épingles, rayons décroissants, enchaînements en S et
